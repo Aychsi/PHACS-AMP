@@ -1,0 +1,459 @@
+---
+title: "HealthOutcomePHIV"
+output: html_document
+date: "2023-02-04"
+---
+
+Outcomes: the following physical, mental, and behavioral health outcomes at last known visit: functional limitations (e.g, whether your health limited you in the kinds or amounts of vigorous activities), multimorbidity diagnosis (i.e., whether an individual has two or more chronic conditions (e.g., heart problem, hypertension, asthma, diabetes, depression)), neurocognitive functioning, (i.e., NIH Toolbox fluid cognition, crystallized cognition, total cognition composite scores), and risk behaviors (i.e., substance use). Evidence of depression, anxiety, PTSD, alcohol/other substance use is available via CDQ (Client Diagnostic Questionnaire). 
+
+# Functional Limitation
+NB: Other measures for general mental health issues do not have enough timepoints. The files below
+have questions on mental health, but they are very basic, and they do not seem to be based on any 
+specific test. Last resort in a sense.
+
+- QLW0120 General Health Self Assessment 12 Up
+- QLW0122 Quality of Life Assessment (12-20 years) : might be the same as above...Or not finished yet
+- QLW0121 Same as above but 5-11 years old
+
+# libraries
+```{r}
+library("RcmdrMisc")
+library("haven")
+library("skimr")
+library("dplyr")
+library("ggplot2")
+```
+
+
+
+```{r}
+qlw0121 <- read_sas("data/qlw0121.sas7bdat")
+
+skim(qlw0121)
+table(qlw0121$week)
+```
+Average age 10.28 years (sd: 1.6 years)
+
+## Get only necessary columns
+```{r}
+qlw0121_fl <- subset(qlw0121, select = c(`publicID`, `week`, `visitage`, `hvigor`, `hmoderat`, 
+                                      `hwalkup`, `hwlkblok`, `hbending`, `heatdres`))
+
+skim(qlw0121_fl)
+table(qlw0121_fl$week)
+```
+1 = not at all
+5 = extremely 
+
+
+## Merge to see how many common participants
+```{r}
+nrow(m4) # 762
+nrow(qlw0121_fl) # 469
+
+nrow(merge(m4, qlw0121_fl, by.x = c("publicID", "week"))) # 151
+# This is only for participants who are 12 and up within m4
+
+```
+151 common participants. One thing to note is that qlw0121_fl only has 48 and 96 week time points.
+
+
+
+```{r}
+qlw0120 <- read_sas("data/qlw0120.sas7bdat")
+table(qlw0120$week)
+skim(qlw0120)
+```
+Average age 13.93 years (sd: 2.4 years)
+
+
+5-11 year olds
+```{r}
+qlw0120_fl <- subset(qlw0120, select = c(`publicID`, `week`, `visitage`, `hvigor`, `hmoderat`, 
+                                      `hwalkup`, `hwlkblok`, `hbending`, `heatdres`))
+
+
+skim(qlw0120_fl)
+length(unique(qlw0120_fl$publicID))
+table(qlw0120_fl$week)
+```
+Also only has timepoint at 48 and 96 again
+
+
+## Merge to see how many common participants
+```{r}
+nrow(m4) # 762
+nrow(qlw0120_fl) # 862
+
+nrow(merge(m4, qlw0120_fl, by = c("publicID", "week"))) # 414
+
+```
+414 common participants from week 48 and 96
+
+
+
+Merge qlw0121 and qlw0120 together first...
+```{r}
+qlw_all_fl <- rbind(qlw0120_fl, qlw0121_fl)
+
+qlw_all_fl
+qlw_all_fl[qlw_all_fl$publicID == 825524, ]
+
+```
+There are some duplicates, but it seems like within these duplicates, one set has NA's while the other doesnt. 
+
+
+Find duplicated rows and merge them
+```{r}
+qlw_dup <- qlw_all_fl[duplicated(qlw_all_fl[,c(1,3)]) | duplicated(qlw_all_fl[,c(1,3)], fromLast = T), ]
+qlw_not_dup <- qlw_all_fl[!(duplicated(qlw_all_fl[,c(1,3)]) | duplicated(qlw_all_fl[,c(1,3)], fromLast = T)), ]
+qlw_dup_merged <- qlw_dup %>% group_by(publicID, visitage) %>% 
+  summarise(across(everything(), mean, na.rm = TRUE), .groups = 'drop')
+qlw_dup_merged
+
+
+```
+
+Merge fixed duplicated and regular dataframe
+```{r}
+qlw_fix <- rbind(qlw_dup_merged, qlw_not_dup) 
+nrow(qlw_fix) #1141 This is close to other dataset sizes
+
+```
+
+
+```{r}
+table(qlw_fix$week)
+length(unique(qlw_fix$publicID)) # 612
+skim(qlw_fix)
+```
+
+## Merge to see how many common participants
+```{r}
+nrow(m4)# 762
+length(unique(m4$publicID)) #254
+nrow(qlw_fix) # 1145
+
+length(unique(merge(m4, qlw_fix, by = c("publicID", "week"))$publicID)) # 509
+
+```
+
+
+# Multimorbidity Diagnoses
+ Glucose tolerance Test
+- ACASI
+-- heart disease, cancer, depression, asthma, adhd, bipolar disorder, diabetes, hiv, learning disability, seizures, 
+
+NB: ACASI will be conducted for sexual behavior and substance use for participants > 10 years of age
+ACASI: 6 months, 2.5, 4, 5 and 6 years
+
+```{r}
+acasi <- read_sas("/Users/hansoochang/Drexel/PHACS:AMP/data/acasi.sas7bdat")
+acasi <- subset(acasi, select = c(`publicID`, `mergeweek`, `visitage`, `Cancer`, `Depression`, `Asthma`,
+                                  `ADHD`, `Bipolar`, `Diabetes`, `HIV`, `LearningDis`, `Seizures`,
+                                  `HeartDisease`))
+skim(acasi)
+table(acasi$mergeweek)
+acasi
+
+table(acasi$Cancer)
+```
+Very few entries for multimorbidity. Only about 7% for each category is completed. 
+We could merge to get a larger sample size like ABCD...
+
+## ACASI for risky behavior (substance use and alcohol use)
+
+```{r}
+acasi_risky <- acasi %>% select(c(1,28, 630, 629, 624 ,626, 432:473, 484:497, 507:521))
+
+skim(acasi_risky)
+table(acasi_risky$AlcoholEver)
+table(acasi_risky$AlcoholFrstAge1)
+```
+
+
+```{r}
+table(acasi_risky$SmokeEver)
+table(acasi_risky$DipEver)
+table(acasi_risky$AlcoholEver)
+table(acasi_risky$MarijEver)
+table(acasi_risky$OTCEver)
+table(acasi_risky$RXEver)
+table(acasi_risky$IllctEver)
+table(acasi_risky$ShootEver)
+
+hist(acasi_risky$SmokeFrstAge1, xlim = c(0, 20))
+table(acasi_risky$AlcoholFrstAge1)
+table(acasi_risky$MarijFrstAge1)
+table(acasi_risky$OTCFrstAge1)
+table(acasi_risky$RxFrstAge1)
+table(acasi_risky$IllctFrstAge1)
+table(acasi_risky$ShootFrstAge1)
+
+length(unique(acasi_risky$publicID))
+acasi_risky %>% group_by(publicID) %>% summarise(total = sum(SmokeEver))
+```
+
+
+
+PH6850 Diagnoses
+```{r}
+diag <- read_sas("data/ph6850.sas7bdat")
+
+#diag[which(diag$diagcd == 29999),]
+
+diag <- subset(diag, select = c(`publicID`, `week`, `visitage`,`diagcd`, `onsetage`))
+
+skim(diag) # Complete rate for diagnoses: 87%
+table(diag$week)
+sort(table(diag$publicID))
+sort(table(diag$diagcd))
+```
+1. 27010 (Asthma): 612
+2. 27306 (ADHD): 526
+3. 29999 (Other): 451
+4. 28540 (Eczema): 232
+5. 21326 (Otitis media,acute,clinical): 220
+6. 22101 (Tinea,presumed): 161
+7. 27335 (Learning Disorder): 150
+8. 27336 (Communication Disorder): 135
+9. (Acne)
+10. (Infection)
+11. 27219 (Metabolic/endocrine disorder): 111
+12. (candida infection)
+13. 27330 (Hearing Loss): 108
+
+
+Merging with BM's
+```{r}
+m4_diag <- merge(m4, diag, by = c("publicID", "week"))
+table(m4_diag$week)
+length(unique(m4_diag$publicID)) # 254 unique ID's
+
+```
+
+
+PH0013 CDC Clinical Classification Age Under 13
+PH0014 CDC Clinical Classification Ages 13 Up
+```{r}
+cdc_clin_u13 <- read_sas("data/ph0013.sas7bdat")
+cdc_clin_a13 <- read_sas("data/ph0014.sas7bdat")
+skim(cdc_clin_u13)
+skim(cdc_clin_a13)
+cdc_clin_a13
+```
+Not much here.
+
+
+
+# Neurocognitive Diagnoses
+There is a lot here, so we can split into a few categories (See Appendix VI)
+
+## Neurodevelopment
+### Starts at Entry
+- IQ and Memory/Attention: WISC-IV (NPW4156)
+- Adaptive Functioning: ABAS-II (Only Parent report) (NE4159)
+### Starts at 6 month or later
+- Language: CELF-IV (NE4165)
+- Exec Func: BRIEF (Child and parent report) p:(NE4162) c:(NE4164)
+- Achievement: WIAT-II (NE4174) 
+- Children's Color Trails Test (NE4178)
+- Woodcock Reading Mastery (NE4177)
+```{r}
+iq_mem <- read_sas("data/npw4156.sas7bdat")
+adfunc <- read_sas("data/ne4159.sas7bdat")
+
+lang <- read_sas("data/ne4165.sas7bdat")
+exec_p <- read_sas("data/ne4162.sas7bdat")
+exec_c <- read_sas("data/ne4164.sas7bdat")
+achiev <- read_sas("data/ne4174.sas7bdat")
+color <- read_sas("data/ne4178.sas7bdat")
+reading <- read_sas("data/ne4177.sas7bdat")
+```
+
+# IQ and Memory/Attention: WISC-IV (NPW4156)
+Get only Composite score for brevity
+```{r}
+skim(iq_mem)
+iq_mem_comp <- subset(iq_mem, select = c(`publicID`, `week`, `visitage`, `verbiqco`, `prcreaco`,
+                                              `wrkmemco`, `prospeco`, `fulliqco`))
+
+
+table(iq_mem$week)
+skim(iq_mem_comp)
+
+```
+Only at baseline
+
+
+
+# Adaptive Functioning: ABAS-II (Only Parent report) (NE4159)
+```{r}
+table(adfunc$week)
+skim(adfunc)
+length(unique(adfunc$publicID))
+```
+
+
+# Exec Func: BRIEF (Child and parent report) p:(NE4162) c:(NE4164)
+```{r}
+table(exec_p$week)
+table(exec_c$week)
+
+nrow(exec_p) # 603
+nrow(exec_c) # 496
+skim(exec_p)
+skim(exec_c)
+
+length(unique(exec_p$publicID))
+length(unique(exec_c$publicID))
+```
+
+
+# Language
+```{r}
+table(lang$week)
+skim(lang)
+length(unique(lang$publicID))
+```
+
+# Achievement
+```{r}
+table(achiev$week)
+```
+
+# Color 
+```{r}
+table(color$week)
+```
+
+
+
+# Reading
+```{r}
+table(reading$week)
+```
+
+
+
+
+
+## Mental Health
+### Starts at Entry
+- Behavior: BASC-2 (Child and Parent Report) (NE4158)
+NE4162 - parent report
+
+
+```{r}
+beh_c <- read_sas("data/ne4158.sas7bdat")
+beh_p <- read_sas("data/npw4157.sas7bdat")
+
+table(beh_c$week)
+table(beh_p$week)
+```
+With BASC, we have most timepoints at 0, 72, 96
+
+Get only t-scores of columns and skim
+```{r}
+beh_c_t <- select(beh_c, contains(c("publicID", "week", "visitage","acc", "ts")))
+skim(beh_c_t)
+length(unique(beh_c_t$publicID))
+
+beh_p_t <- select(beh_p, contains(c("publicID", "week", "visitage","acc", "ts")))
+skim(beh_p_t)
+length(unique(beh_p_t$publicID))
+```
+
+
+
+
+
+## Quality of Life (mental, social, physical)
+
+Merge qlw0121 and qlw0120 together first...
+```{r}
+# qlw0120 has some extra column names. Let's remove these to keep it simple. This also gets rid of duplicates
+rem <- colnames(qlw0120[!(colnames(qlw0120) %in% colnames(qlw0121))])
+qlw0120 <- qlw0120[, -which(names(qlw0120) %in% rem)]
+
+qlw_all <- rbind(qlw0120, qlw0121)
+
+nrow(qlw_all) # 469
+
+```
+
+
+The higher the number, the worse the outcome. All different types of questions..
+```{r}
+# colnames(qlw_all)
+qlw_all_ment <- subset(qlw_all, select = c(`publicID`, `week`, `visitage`, `feelemot`, 
+                                           `pmoodchg`: `pconfuse`, `pimpulsv`:`pworthls`,
+                                           `pobsess`:`outschol`))
+qlw_all_soc <- subset(qlw_all, select = c(`publicID`, `week`, `visitage`, `pbullies`: `pgtalngt`, 
+                                          `pnotlike`))
+qlw_all_phys <- subset(qlw_all, select = c(`publicID`, `week`, `visitage`, `feelphys`, `symppain`:
+                                             `symovral`))
+
+
+length(unique(qlw_all_ment$publicID))
+length(unique(qlw_all_phys$publicID))
+length(unique(qlw_all_phys$publicID)) # 288
+```
+
+Merge
+```{r}
+m4_qlw_ment <- merge(m4, qlw_all_ment, by = c("publicID", "week"))
+
+length(unique(m4_qlw_ment))
+
+```
+
+
+
+
+
+# Risky Behaviors
+- ACASI (substance use)
+- Adherence
+
+Substance and Alcohol Use
+```{r}
+acasi_sub_alc <- read_sas("/Users/hansoochang/Drexel/PHACS:AMP/data/acasi.sas7bdat")
+acasi_sub_alc <- select(acasi_sub_alc, contains(c("publicID", "week", "visitage", "Smoke", "Dip", "Tobacco", 
+                                      "Alcohol", "Marij", "Inhal", "Rx", "Illct", "I3Mo", 
+                                      "AnyDrug3Mos", "Shoot")))
+
+skim(acasi_sub_alc)
+table(acasi_sub_alc$mergeweek)
+length(unique(acasi_sub_alc$publicID)) # 454
+```
+
+
+merge
+```{r}
+acasi_sub_alc$week <- acasi_sub_alc$mergeweek
+m4_acasi_risk <- merge(m4, acasi_sub_alc, by = c("publicID", "week"))
+
+length(unique(m4_acasi_risk)) # 140
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

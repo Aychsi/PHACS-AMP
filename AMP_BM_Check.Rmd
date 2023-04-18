@@ -1,0 +1,560 @@
+---
+title: "AMP_BM_Check"
+output: html_document
+date: "2023-01-30"
+---
+
+# Libraries and wd
+```{r}
+library("skimr")
+library("dplyr")
+library("RcmdrMisc")
+library("haven")
+library("sjPlot")
+```
+
+
+
+# Blood BM
+## Cardiovascular Indicators (bp)
+```{r}
+bp <- read_sas("data/evw0173.sas7bdat")
+nrow(bp) # 2621
+length(unique(bp$publicID)) # 674
+head(bp,10)
+skim(bp)
+```
+There are a lot of missing data points for diastol3 and systol3. They take three measurements just to make sure they are somewhat consistent. We can average all three, and if any one is missing, just average whatever numbers we have. If all three are missing, then it's a NaN
+
+```{r}
+bp$syst_avg <- rowMeans(subset(bp, select = c(`systol1`, `systol2`, `systol3`)), na.rm = TRUE)
+bp$dia_avg <- rowMeans(subset(bp, select = c(`diastol1`, `diastol2`, `diastol3`)), na.rm = TRUE)
+
+skim(bp)
+```
+
+
+# Only get the average systol and diastol and other relevent info
+```{r}
+bp_avg <- subset(bp, select = c(`publicID`, `week`, `syst_avg`, `dia_avg`))
+
+length(bp_avg$publicID) #2570
+length(unique(bp_avg$publicID)) # 673
+table(bp_avg$week)
+```
+
+```{r}
+skim(bp_avg)
+
+bp_avg %>% group_by(week) %>% summarize(sum_na_syst = sum(is.na(syst_avg)),
+                                        sum_na_dia = sum(is.na(dia_avg)))
+```
+Not many missing
+
+
+# LBW0070 Routine Chemistries
+```{r}
+mm <- read_sas("data/lbw0070.sas7bdat")
+
+length(unique(mm$publicID))
+
+skim(mm)
+```
+
+# Get only values we are interested in
+```{r}
+colnames(mm)
+mm <- subset(mm, select = -c(`bunlon`, `bungrd`, `glucval`:`pyru1val`, `othchem`:`othage3`, `visitobt`))
+skim(mm)
+
+```
+sgptval -  ALT/SGPT value
+sgptlon - ALT/SGPT ULN (upper limit normal)
+sgptgrd - ALT/SGPT grade
+
+sgotval- AST/SGOT value
+sgotlon - AST/SGOT ULN
+sgotgrd - AST/SGOT grade
+NOTES: We may not need ULN. Grade is telling is how bad this value is ordinally (See data dictionary).
+
+bunval - BUN value mg/dl
+
+ckval - Creatine kinase value
+cklon - Creatine kinase ULN
+ckgrd - Creatine kinase grade
+
+lipval - Lipase value
+liplon - Lipase ULN
+lipgrd - Lipase grade 
+
+cretval - Serum Creatine kinase value
+cretlon - Serum Creatine kinase ULN
+cretgrd - Serum Creatine kinase grade
+
+To Take out:
+enrsmart
+amppos
+chemres
+
+ftcval - fasting total cholesterol value
+ftcgrd - fasting total cholesterol grade
+
+ftgval - fasting triglycerides value
+ftggrd - fasting triglycerides grade
+
+fldlval - Fasting LDL value mg/dl
+fldlgrd - Fasting LDL grade
+
+fhdlval - Fasting HDL value mg/dl
+fhdlgrd - Fasting HDL grade
+
+everything after ochem is discontinued..
+
+
+# Find duplicated rows and merge them
+NB: If there are multiple values for the same measure, average them. However, there are very few
+cases of this
+```{r}
+mm_dup <- mm[duplicated(mm[,c(1,3)]) | duplicated(mm[,c(1,3)], fromLast = T), ]
+mm_not_dup <- mm[!(duplicated(mm[,c(1,3)]) | duplicated(mm[,c(1,3)], fromLast = T)), ]
+mm_dup_merged <- mm_dup %>% group_by(publicID, week) %>% 
+  summarise(across(everything(), mean, na.rm = TRUE), .groups = 'drop')
+
+
+mm_dup
+```
+Merge fixed duplicated and regular dataframe
+```{r}
+mm_dup_merged$study <- as.character(mm_dup_merged$study)
+
+mm_fix <- rbind(mm_dup_merged, mm_not_dup) 
+nrow(mm_fix) #2051 This is close to other dataset sizes
+
+```
+
+
+```{r}
+table(mm_fix$week)
+
+mm_fix_3 <- subset(mm_fix, week %in% c(0, 48, 96))
+table(mm_fix_3$week)
+
+length(mm_fix_3$publicID) #1321
+length(unique(mm_fix_3$publicID)) # 560
+
+mm_fix_3
+skim(mm_fix_3)
+```
+
+
+# NaN's in each column
+```{r}
+na_count <-sapply(mm_fix_3, function(y) sum(length(which(is.na(y)))))
+
+# Percent of NA's in each column
+na_count/1059
+```
+Nothing has more less than 50% complete
+
+
+# LBW0073 Routine Hematologies
+```{r}
+hem <- read_sas("data/lbw0073.sas7bdat")
+hem[hem$publicID == 215941, ]
+skim(hem)
+
+length(unique(hem$publicID))
+
+```
+
+
+# Get only columns we are interested in
+```{r}
+hem <- subset(hem, select = -c(`atlymph`, `othval1`:`oth_gd2`, `othage1`:`othage2`))
+skim(hem)
+```
+
+```{r}
+table(hem$week)
+
+# length(hem[complete.cases(hem),]$publicID) #1842
+# length(unique(hem[complete.cases(hem),]$publicID)) # 447
+# comp_hem <- hem[complete.cases(hem),]
+```
+
+Only 44% of alympcnt (Absolute lymphocyte count (mm^3)) and alympgrd (grade) are complete at baseline. We can take this out.
+
+
+```{r}
+hem_3 <- subset(hem, week %in% c(0, 48, 96))
+table(hem_3$week)
+
+hem_3 <- hem_3 %>% group_by(publicID) %>% mutate(total = n())
+
+length(unique(hem_3$publicID)) # 450
+
+hem_3 <- subset(hem_3, select = -c(`hemadone`, `othhemob`, `formver`, `oth1`, `oth2`, `total`))
+
+```
+
+# NaN's in each column
+```{r}
+na_count_hem <-sapply(hem_3, function(y) sum(length(which(is.na(y)))))
+
+# Percent of NA's in each column
+na_count_hem/1298
+```
+Nothing here has more less than 50% complete.
+
+
+# Height, weight, body measurements (i.e., waist, hip) EVW0169
+```{r}
+gro <- read_sas("data/evw0169.sas7bdat")
+
+skim(gro)
+
+gro <- subset(gro, select = c(`publicID`, `week`, `height1`, `height2`, `height3`,
+                              `weight1`, `weight2`, `weight3`,
+                              `mwc1`, `mwc2`, `mwc3`))
+gro$weight_avg <- rowMeans(subset(gro, select = c(`weight1`, `weight2`, `weight3`)), na.rm = TRUE)
+gro$height_avg <- rowMeans(subset(gro, select = c(`height1`, `height2`, `height3`)), na.rm = TRUE)
+gro$mwaist_avg <- rowMeans(subset(gro, select = c(`mwc1`, `mwc2`, `mwc3`)), na.rm = TRUE)
+gro$bmi <- gro$weight_avg / ((gro$height_avg)/100)^2
+
+gro_avg <- subset(gro, select = c(`publicID`, `week`, `weight_avg`, `height_avg`, `bmi`, `mwaist_avg`))
+```
+
+The formula is BMI = kg/m2 where kg is a person’s weight in kilograms and m2 is their height in metres squared.
+```{r}
+table(gro_avg$week)
+
+gro_avg_3 <- subset(gro_avg, week %in% c(0, 48, 96))
+gro_avg_3 <- gro_avg_3 %>% group_by(publicID) %>% mutate(total = n())
+
+length(unique(gro_avg_3$publicID)) # 674
+gro_avg_3 <- gro_avg_3 %>% select(-c(total))
+gro_avg_3
+```
+# See how many NaNs in each column
+```{r}
+na_count_gro <-sapply(gro_avg_3, function(y) sum(length(which(is.na(y)))))
+
+# Percent of NA's in each column
+na_count_gro/1827
+```
+Nothing has more than 50% missing
+
+# Get HIV status DMW0080
+```{r}
+dem <- read_sas("data/dmw0080.sas7bdat")
+table(dem$hivinf)
+
+dem <- subset(dem, select = c(`publicID`, `week`, `hivinf`))
+dem[dem$publicID == 95804,]
+dem_3 <- dem %>% group_by(publicID) %>% summarize(hivinf1 = mean(hivinf, na.rm = TRUE))
+dem_3
+table(dem_3$hivinf1)
+```
+
+
+# Merging
+```{r}
+nrow(bp_avg) # 2621
+nrow(mm_fix_3) # 1321
+m1 <- merge(bp_avg, mm_fix_3, by = c("publicID", "week"))
+nrow(m1) # 1316
+
+nrow(hem_3) # 1298
+m2 <- merge(m1, hem_3_all, by = c("publicID", "week"))
+nrow(m2) # 853
+
+nrow(gro_avg_3) # 1827
+m3 <- merge(m2, gro_avg_3, by = c("publicID", "week"))
+nrow(m3) # 864
+
+nrow(dem_3) # 669
+m4 <- merge(m3, dem_3, by = c("publicID"))
+nrow(m4) # 864
+```
+
+# Overall characteristics
+```{r}
+skim(m4)
+m4
+
+# Number of NA's by row (observation for participant at time point x)
+na_count_final_rows <- apply(X = is.na(m4), MARGIN = 1, FUN = sum)
+
+sort(na_count_final_rows/(ncol(m4) - 5), decreasing = T)[0:30]
+# There are some observations where most of the datapoints are missing across columns
+
+less_50 <- which(na_count_final_rows/(ncol(m4) - 5) >= 0.50)
+# Indices of those with more than 50% of BM's missing
+
+# Get rid of those observations
+m4 <- m4[-less_50,]
+m4 <- m4 %>% select(-c(study.x, hivinf1, chemobt))
+
+
+# Number of NA's in each column
+na_count_final_cols <-sapply(m4, function(y) sum(length(which(is.na(y)))))
+
+sort(na_count_final_cols/nrow(m4))
+```
+No column has more than 50% missing
+
+
+# Overall Characteristics By Week
+```{r}
+m4_0 <- m4[m4$week == 0,]
+m4_48 <- m4[m4$week == 48,]
+m4_96 <- m4[m4$week == 96,]
+
+# Returns list with two objects
+# 1. indices of df (observations) where row has less than 50% data available
+# 2. Percentage complete of each column.
+na_count_rows_cols <- function(df) {
+  
+  # Number of NA's by row (observation for participant at time point x)
+  count_rows <- apply(X = is.na(df), MARGIN = 1, FUN = sum)
+  less_50 <- which(count_rows/(ncol(df) - 4) >= 0.50)
+  
+  # Number of NA's in each column
+  count_cols <- sapply(df, function(y) sum(length(which(is.na(y)))))
+  na_cols_perc <- sort((count_cols / nrow(df)), decreasing = T)
+  
+  return(list(less_50, na_cols_perc))
+}
+
+# Run function by week
+na_count_rows_cols(m4_0)
+na_count_rows_cols(m4_48)
+na_count_rows_cols(m4_96)
+
+```
+NB: alympcnt (Lymphocyte count) and alympgrd (Lymphocyte Grade) only have about 32% completed at baseline
+There are a good amount of individual observations missing at 48 weeks.
+
+
+# Histograms for BM's 
+```{r}
+m4_cont <- m4 %>% select(c(syst_avg, dia_avg, sgptval, sgotval, bunval, ckval, lipval, cretval,
+                           ftcval, ftgval, fldlval, fhdlval, hemocv, hema, rbc, mcv, wbccv, neutcv,
+                           anccv, lymph, mono, eosin, baso, platcv, specage, weight_avg, height_avg,
+                           bmi, mwaist_avg))
+
+
+m4_list_cont <- colnames(m4_cont)
+
+for (coln in m4_list_cont) {
+  print(
+    ggplot(data = m4, aes_string(coln)) + 
+  geom_histogram(bins = 30) + 
+  facet_grid(. ~ week) +
+  labs(title = paste(coln, "by Week"),
+       x = coln,
+       y = "Frequency") + 
+  theme(plot.title = element_text(hjust = 0.5))
+  )
+}
+
+
+```
+
+# Make Tables
+```{r}
+m4_0_col_perc <- data.frame(na_count_rows_cols(m4_0)[2])
+m4_48_col_perc <- data.frame(na_count_rows_cols(m4_48)[2])
+m4_96_col_perc <- data.frame(na_count_rows_cols(m4_96)[2])
+
+# rename columns
+m4_0_col_perc <-  cbind(Measure = rownames(m4_0_col_perc), m4_0_col_perc)
+rownames(m4_0_col_perc) <- 1:nrow(m4_0_col_perc)
+colnames(m4_0_col_perc)[2] <- "Prop. Complete (Week 0)"
+
+# cbind 48 and 96 to the df
+colnames(m4_48_col_perc)[1] <- "Prop. Complete (Week 48)"
+colnames(m4_96_col_perc)[1] <- "Prop. Complete (Week 96)"
+
+bmt1 <- cbind(m4_0_col_perc, m4_48_col_perc)
+bm_cols_table <- cbind(bmt1, m4_96_col_perc)
+
+# Export to Doc file
+tab_df(bm_cols_table, file = "test.doc")
+
+
+```
+
+
+# Final BM's
+```{r}
+m4_fin <- m4 %>% select(-c(sgptlon, sgptgrd, sgotlon, sgotgrd, cklon, ckgrd, liplon, lipgrd, cretlon,
+                          cretgrd, enrsmart, amppos, chemres, ftcgrd, ftggrd, fldlgrd, fhdlgrd, 
+                          study.y, hemo_gd, anc_gd, plat_gd, alympgrd, plat_gd, alympgrd, wbcgrd))
+
+skim(m4_fin)
+
+```
+
+# Stargazer
+```{r}
+#install.packages("stargazer")
+library(stargazer)
+```
+
+# Tables for participants
+```{r}
+dem <- read_sas("/Users/hansoochang/Drexel/PHACS:AMP/data/master.sas7bdat")
+dem <- dem %>% select(publicID, entryage, sex, prace, pethnc)
+
+m4_dem <- merge(m4_fin, dem, by = c("publicID")) %>% 
+  select(entryage, week, sex, prace, pethnc)
+
+m4_dem %>% group_by(sex, week) %>% summarise(count = n(), )
+
+# Change variable names race
+m4_dem$prace[m4_dem$prace == 1001] <- "American Indian/Alaska Native"
+m4_dem$prace[m4_dem$prace == 1002] <- "Asian"
+m4_dem$prace[m4_dem$prace == 1003] <- "Native Hawiaiian or other Pacific Islander"
+m4_dem$prace[m4_dem$prace == 1004] <- "Black or African American"
+m4_dem$prace[m4_dem$prace == 1005] <- "White"
+m4_dem$prace[m4_dem$prace == 1006] <- "American Indian"
+m4_dem$prace[m4_dem$prace == 1007] <- "Alaskan Native"
+m4_dem$prace[m4_dem$prace == 8000] <- "Other"
+m4_dem$prace[m4_dem$prace == 9000] <- "More than One Race"
+m4_dem$prace <- as.factor(m4_dem$prace)
+
+# Change variable names in 
+m4_dem$sex[m4_dem$sex == 1] <- "M"
+m4_dem$sex[m4_dem$sex == 2] <- "F"
+m4_dem$sex <- as.factor(m4_dem$sex)
+
+m4_dem$entryage <- as.numeric(m4_dem$entryage)
+
+skim(m4_dem)
+
+
+```
+
+
+# Tables for BM's
+```{r}
+m4_bms <- m4_fin %>% select(-c(publicID))
+  
+m4_bms %>% group_by(week) %>% summarize()
+
+skim(m4_bms)
+  
+```
+
+
+
+
+
+NB: We can add fasting glucose via  LBW0071
+
+### Cardiovascular Indicators (bp)
+Average Blood Pressure
+
+### Metabolic Markers (total cholesterol, fasting glucose) ###
+ftcval - fasting total cholesterol value 
+ftcgrd - fasting total cholesterol grade
+
+fldlval - Fasting LDL value mg/dl
+fldlgrd - Fasting LDL grade
+
+fhdlval - Fasting HDL value mg/dl
+fhdlgrd - Fasting HDL grade
+
+
+### Markers of inflammation and infection (e.g., cytomegalovirus, C-reactive protein, albumin, IL-6) ###
+lipval - Lipase value
+liplon - Lipase ULN
+lipgrd - Lipase grade 
+
+(From tology)
+anccv - Abs count neutrophil value (mm^3)
+platcv - Platelets value (mm^3)
+hemocv - Hemoglobin value (g/dl)
+rbc - RBC value (million/ul)
+mcv - MCV value (microns)
+wbccv - WBC value (mm^3)
+lymphocyte count
+
+
+### Markers of organ functioning (serum creatinine, peak flow, BUN, alkaline phosphatase) ###
+sgptval -  ALT/SGPT value
+sgptlon - ALT/SGPT ULN (upper limit normal)
+sgptgrd - ALT/SGPT grade
+
+sgotval- AST/SGOT value
+sgotlon - AST/SGOT ULN
+sgotgrd - AST/SGOT grade
+NOTES: We may not need ULN. Grade is telling is how bad this value is ordinally (See data dictionary).
+
+cretval - Serum Creatine kinase value
+cretlon - Serum Creatine kinase ULN
+cretgrd - Serum Creatine kinase grade
+
+bunval - BUN value mg/dl
+
+## i.e., creatinine, blood urea nitrogen, AST, ALT, lipids, fasting glucose and insulin, fasting lipids and renal and cardiac biomarkers
+
+# Height, weight, body measurements (i.e., waist, hip)
+
+
+
+
+
+
+
+# Common BM's
+```{r}
+mm
+pheu <- dem_3[dem_3$hivinf1 == 2, ]
+
+merge(mm, pheu, by = c("publicID"))
+```
+
+
+
+
+# Urine BM's SPW0396
+```{r}
+uri <- read_sas("data/spw0396.sas7bdat")
+uri
+```
+
+### Cardiovascular Indicators (bp)
+Average Blood Pressure
+
+### Metabolic Markers (total cholesterol, fasting glucose) ###
+Values from SPW0396, but categorical..
+
+### Markers of inflammation and infection (e.g., cytomegalovirus, C-reactive protein, albumin, IL-6) ###
+Values from SPW0396, but categorical..
+
+### Markers of organ functioning (serum creatinine, peak flow, BUN, alkaline phosphatase) ###
+Values from SPW0396, but categorical..
+
+# Height, weight, body measurements (i.e., waist, hip)
+Height
+Weight
+BMI
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
