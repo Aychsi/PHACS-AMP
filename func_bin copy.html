@@ -1,0 +1,1039 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.3.450">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>BinLog_Reg_Template</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="BinLog_Reg_Template_files/libs/clipboard/clipboard.min.js"></script>
+<script src="BinLog_Reg_Template_files/libs/quarto-html/quarto.js"></script>
+<script src="BinLog_Reg_Template_files/libs/quarto-html/popper.min.js"></script>
+<script src="BinLog_Reg_Template_files/libs/quarto-html/tippy.umd.min.js"></script>
+<script src="BinLog_Reg_Template_files/libs/quarto-html/anchor.min.js"></script>
+<link href="BinLog_Reg_Template_files/libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="BinLog_Reg_Template_files/libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="BinLog_Reg_Template_files/libs/bootstrap/bootstrap.min.js"></script>
+<link href="BinLog_Reg_Template_files/libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="BinLog_Reg_Template_files/libs/bootstrap/bootstrap.min.css" rel="stylesheet" id="quarto-bootstrap" data-mode="light">
+
+
+</head>
+
+<body>
+
+<div id="quarto-content" class="page-columns page-rows-contents page-layout-article">
+<div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+  <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">Table of contents</h2>
+   
+  <ul>
+  <li><a href="#change-data-frame-format" id="toc-change-data-frame-format" class="nav-link active" data-scroll-target="#change-data-frame-format">Change Data Frame Format</a></li>
+  <li><a href="#run-regressions" id="toc-run-regressions" class="nav-link" data-scroll-target="#run-regressions">Run Regressions</a></li>
+  <li><a href="#get-p-values" id="toc-get-p-values" class="nav-link" data-scroll-target="#get-p-values">Get P-Values</a></li>
+  <li><a href="#accuracy-sensitivity-specificity" id="toc-accuracy-sensitivity-specificity" class="nav-link" data-scroll-target="#accuracy-sensitivity-specificity">Accuracy, Sensitivity, Specificity</a></li>
+  <li><a href="#check-multicollinearity" id="toc-check-multicollinearity" class="nav-link" data-scroll-target="#check-multicollinearity">Check Multicollinearity</a>
+  <ul class="collapse">
+  <li><a href="#correlation-matrix" id="toc-correlation-matrix" class="nav-link" data-scroll-target="#correlation-matrix">Correlation Matrix</a></li>
+  <li><a href="#vif" id="toc-vif" class="nav-link" data-scroll-target="#vif">VIF</a></li>
+  </ul></li>
+  <li><a href="#run-stepwise-aic" id="toc-run-stepwise-aic" class="nav-link" data-scroll-target="#run-stepwise-aic">Run Stepwise AIC</a></li>
+  <li><a href="#optimize-by-chi-square" id="toc-optimize-by-chi-square" class="nav-link" data-scroll-target="#optimize-by-chi-square">Optimize By Chi Square</a></li>
+  <li><a href="#show-visuals" id="toc-show-visuals" class="nav-link" data-scroll-target="#show-visuals">Show Visuals</a></li>
+  </ul>
+</nav>
+</div>
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">BinLog_Reg_Template</h1>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+</header>
+
+<p>This file runs Binomial Logistic regression analyses</p>
+<p>Regression Template: 96 week outcome ~ PoA*sex + entry_age + baseline_outcome</p>
+<section id="change-data-frame-format" class="level1">
+<h1>Change Data Frame Format</h1>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>df <span class="ot">&lt;-</span> jsonlite<span class="sc">::</span><span class="fu">fromJSON</span>(params<span class="sc">$</span>df)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</section>
+<section id="run-regressions" class="level1">
+<h1>Run Regressions</h1>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Chang</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>chang_log <span class="ot">&lt;-</span> <span class="fu">run_logit_models</span>(df, params<span class="sc">$</span>outcome_list,</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>                                      <span class="st">"poa_chang*sex + entryage + income + prace"</span>,</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a>                                params<span class="sc">$</span>last_time, params<span class="sc">$</span>first_time)</span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a> <span class="co"># Belsky</span></span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>belsky_log <span class="ot">&lt;-</span> <span class="fu">run_logit_models</span>(df, params<span class="sc">$</span>outcome_list,</span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>                                       <span class="st">"poa_belsky*sex + entryage + income + prace"</span>,</span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a>                                params<span class="sc">$</span>last_time, params<span class="sc">$</span>first_time)</span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a> <span class="co"># KDM</span></span>
+<span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a>kdm_log <span class="ot">&lt;-</span> <span class="fu">run_logit_models</span>(df, params<span class="sc">$</span>outcome_list,</span>
+<span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a>                                        <span class="st">"kdm_advance_0_kdm*sex + entryage + income + prace"</span>,</span>
+<span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a>                                params<span class="sc">$</span>last_time, params<span class="sc">$</span>first_time)</span>
+<span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a> </span>
+<span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a><span class="co"># # Chang</span></span>
+<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a><span class="co"># chang_log &lt;- run_logit_models(all_poa_diag_bin,</span></span>
+<span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a><span class="co">#                               getOutcomeNames(all_poa_diag_bin),</span></span>
+<span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a><span class="co">#                                       "poa_chang*sex + entryage + income + prace",</span></span>
+<span id="cb2-20"><a href="#cb2-20" aria-hidden="true" tabindex="-1"></a><span class="co">#                                "96", "0")</span></span>
+<span id="cb2-21"><a href="#cb2-21" aria-hidden="true" tabindex="-1"></a><span class="co"># </span></span>
+<span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a><span class="co"># </span></span>
+<span id="cb2-23"><a href="#cb2-23" aria-hidden="true" tabindex="-1"></a><span class="co"># # Belsky</span></span>
+<span id="cb2-24"><a href="#cb2-24" aria-hidden="true" tabindex="-1"></a><span class="co"># belsky_log &lt;- run_logit_models(all_poa_diag_bin,</span></span>
+<span id="cb2-25"><a href="#cb2-25" aria-hidden="true" tabindex="-1"></a><span class="co">#                                getOutcomeNames(all_poa_diag_bin),</span></span>
+<span id="cb2-26"><a href="#cb2-26" aria-hidden="true" tabindex="-1"></a><span class="co">#                                        "poa_belsky*sex + entryage + income + prace",</span></span>
+<span id="cb2-27"><a href="#cb2-27" aria-hidden="true" tabindex="-1"></a><span class="co">#                                "96", "0")</span></span>
+<span id="cb2-28"><a href="#cb2-28" aria-hidden="true" tabindex="-1"></a><span class="co"># </span></span>
+<span id="cb2-29"><a href="#cb2-29" aria-hidden="true" tabindex="-1"></a><span class="co"># # KDM</span></span>
+<span id="cb2-30"><a href="#cb2-30" aria-hidden="true" tabindex="-1"></a><span class="co"># kdm_log &lt;- run_logit_models(all_poa_diag_bin,</span></span>
+<span id="cb2-31"><a href="#cb2-31" aria-hidden="true" tabindex="-1"></a><span class="co">#                             getOutcomeNames(all_poa_diag_bin),</span></span>
+<span id="cb2-32"><a href="#cb2-32" aria-hidden="true" tabindex="-1"></a><span class="co">#                                        "kdm_advance_0_kdm*sex + entryage + income + prace",</span></span>
+<span id="cb2-33"><a href="#cb2-33" aria-hidden="true" tabindex="-1"></a><span class="co">#                                "96", "0")</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</section>
+<section id="get-p-values" class="level1">
+<h1>Get P-Values</h1>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>chang_b_p <span class="ot">&lt;-</span> <span class="fu">get_betas_and_pvalues_logit</span>(chang_log)</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>belsky_b_p <span class="ot">&lt;-</span> <span class="fu">get_betas_and_pvalues_logit</span>(belsky_log)</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>kdm_b_p <span class="ot">&lt;-</span> <span class="fu">get_betas_and_pvalues_logit</span>(kdm_log)</span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a><span class="fu">get_significant_vars</span>(chang_b_p, <span class="st">"poa"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>$hwalkup_96
+              Betas    P_Values
+poa_chang -12.86942 0.001650203
+
+$hbending_96
+              Betas   P_Values
+poa_chang -8.794269 0.02225152</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="fu">get_significant_vars</span>(belsky_b_p, <span class="st">"poa"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>$heatdres_96
+                    Betas    P_Values
+poa_belsky       19.22121 0.002267066
+poa_belsky:sexM -33.04818 0.004778425</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="fu">get_significant_vars</span>(kdm_b_p, <span class="st">"kdm"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>$hmoderat_96
+                           Betas    P_Values
+kdm_advance_0_kdm:sexM -1.209624 0.001181333
+
+$hwalkup_96
+                      Betas   P_Values
+kdm_advance_0_kdm -0.654328 0.01627706
+
+$heatdres_96
+                           Betas   P_Values
+kdm_advance_0_kdm:sexM -3.421536 0.03942773</code></pre>
+</div>
+</div>
+</section>
+<section id="accuracy-sensitivity-specificity" class="level1">
+<h1>Accuracy, Sensitivity, Specificity</h1>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>chang_metrics <span class="ot">&lt;-</span> <span class="fu">evaluate_logit_models</span>(df, chang_log)</span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>belsky_metrics <span class="ot">&lt;-</span> <span class="fu">evaluate_logit_models</span>(df, belsky_log)</span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>kdm_metrics <span class="ot">&lt;-</span> <span class="fu">evaluate_logit_models</span>(df, kdm_log)</span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a><span class="co"># chang_metrics &lt;- evaluate_logit_models(all_poa_qol1220_cat, chang_log)</span></span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a><span class="co"># belsky_metrics &lt;- evaluate_logit_models(all_poa_qol1220_cat, belsky_log)</span></span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a><span class="co"># kdm_metrics &lt;- evaluate_logit_models(all_poa_qol1220_cat, kdm_log)</span></span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a><span class="co"># Assuming your outputs are named chang_results, belsky_results, and kdm_results</span></span>
+<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a><span class="co"># Convert each output list to a list of data frames</span></span>
+<span id="cb9-11"><a href="#cb9-11" aria-hidden="true" tabindex="-1"></a>chang_dfs <span class="ot">&lt;-</span> <span class="fu">lapply</span>(chang_metrics, <span class="cf">function</span>(x) <span class="fu">as.data.frame</span>(x))</span>
+<span id="cb9-12"><a href="#cb9-12" aria-hidden="true" tabindex="-1"></a>belsky_dfs <span class="ot">&lt;-</span> <span class="fu">lapply</span>(belsky_metrics, <span class="cf">function</span>(x) <span class="fu">as.data.frame</span>(x))</span>
+<span id="cb9-13"><a href="#cb9-13" aria-hidden="true" tabindex="-1"></a>kdm_dfs <span class="ot">&lt;-</span> <span class="fu">lapply</span>(kdm_metrics, <span class="cf">function</span>(x) <span class="fu">as.data.frame</span>(x))</span>
+<span id="cb9-14"><a href="#cb9-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-15"><a href="#cb9-15" aria-hidden="true" tabindex="-1"></a><span class="co"># Initialize an empty list to store merged data frames</span></span>
+<span id="cb9-16"><a href="#cb9-16" aria-hidden="true" tabindex="-1"></a>merged_dfs <span class="ot">&lt;-</span> <span class="fu">list</span>()</span>
+<span id="cb9-17"><a href="#cb9-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-18"><a href="#cb9-18" aria-hidden="true" tabindex="-1"></a><span class="co"># # Loop through each element and merge the data frames</span></span>
+<span id="cb9-19"><a href="#cb9-19" aria-hidden="true" tabindex="-1"></a><span class="co"># for (name in names(chang_dfs)) {</span></span>
+<span id="cb9-20"><a href="#cb9-20" aria-hidden="true" tabindex="-1"></a><span class="co">#   df1 &lt;- chang_dfs[[name]]</span></span>
+<span id="cb9-21"><a href="#cb9-21" aria-hidden="true" tabindex="-1"></a><span class="co">#   df2 &lt;- belsky_dfs[[name]]</span></span>
+<span id="cb9-22"><a href="#cb9-22" aria-hidden="true" tabindex="-1"></a><span class="co">#   df3 &lt;- kdm_dfs[[name]]</span></span>
+<span id="cb9-23"><a href="#cb9-23" aria-hidden="true" tabindex="-1"></a><span class="co">#   </span></span>
+<span id="cb9-24"><a href="#cb9-24" aria-hidden="true" tabindex="-1"></a><span class="co">#   # Merge all three outputs</span></span>
+<span id="cb9-25"><a href="#cb9-25" aria-hidden="true" tabindex="-1"></a><span class="co">#   merged &lt;- data.frame(</span></span>
+<span id="cb9-26"><a href="#cb9-26" aria-hidden="true" tabindex="-1"></a><span class="co">#     Metric = c("Accuracy", "Sensitivity", "Specificity"),</span></span>
+<span id="cb9-27"><a href="#cb9-27" aria-hidden="true" tabindex="-1"></a><span class="co">#     Chang = c(df1$Accuracy, df1$Sensitivity, df1$Specificity),</span></span>
+<span id="cb9-28"><a href="#cb9-28" aria-hidden="true" tabindex="-1"></a><span class="co">#     Belsky = c(df2$Accuracy, df2$Sensitivity, df2$Specificity),</span></span>
+<span id="cb9-29"><a href="#cb9-29" aria-hidden="true" tabindex="-1"></a><span class="co">#     KDM = c(df3$Accuracy, df3$Sensitivity, df3$Specificity)</span></span>
+<span id="cb9-30"><a href="#cb9-30" aria-hidden="true" tabindex="-1"></a><span class="co">#   )</span></span>
+<span id="cb9-31"><a href="#cb9-31" aria-hidden="true" tabindex="-1"></a><span class="co">#   </span></span>
+<span id="cb9-32"><a href="#cb9-32" aria-hidden="true" tabindex="-1"></a><span class="co">#   merged_dfs[[name]] &lt;- merged</span></span>
+<span id="cb9-33"><a href="#cb9-33" aria-hidden="true" tabindex="-1"></a><span class="co"># }</span></span>
+<span id="cb9-34"><a href="#cb9-34" aria-hidden="true" tabindex="-1"></a><span class="co"># </span></span>
+<span id="cb9-35"><a href="#cb9-35" aria-hidden="true" tabindex="-1"></a><span class="co"># # Print the merged data frames</span></span>
+<span id="cb9-36"><a href="#cb9-36" aria-hidden="true" tabindex="-1"></a><span class="co"># merged_dfs</span></span>
+<span id="cb9-37"><a href="#cb9-37" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-38"><a href="#cb9-38" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-39"><a href="#cb9-39" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-40"><a href="#cb9-40" aria-hidden="true" tabindex="-1"></a><span class="co"># Loop through each element and merge the data frames</span></span>
+<span id="cb9-41"><a href="#cb9-41" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> (name <span class="cf">in</span> <span class="fu">names</span>(chang_dfs)) {</span>
+<span id="cb9-42"><a href="#cb9-42" aria-hidden="true" tabindex="-1"></a>  df1 <span class="ot">&lt;-</span> chang_dfs[[name]]</span>
+<span id="cb9-43"><a href="#cb9-43" aria-hidden="true" tabindex="-1"></a>  df2 <span class="ot">&lt;-</span> belsky_dfs[[name]]</span>
+<span id="cb9-44"><a href="#cb9-44" aria-hidden="true" tabindex="-1"></a>  df3 <span class="ot">&lt;-</span> kdm_dfs[[name]]</span>
+<span id="cb9-45"><a href="#cb9-45" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb9-46"><a href="#cb9-46" aria-hidden="true" tabindex="-1"></a>  <span class="co"># If df1, df2, or df3 is NULL, set MAE and RMSE to NA</span></span>
+<span id="cb9-47"><a href="#cb9-47" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (<span class="fu">is.null</span>(df1)) {</span>
+<span id="cb9-48"><a href="#cb9-48" aria-hidden="true" tabindex="-1"></a>    df1<span class="sc">$</span>Accuracy <span class="ot">&lt;-</span> <span class="cn">NA</span></span>
+<span id="cb9-49"><a href="#cb9-49" aria-hidden="true" tabindex="-1"></a>    df1<span class="sc">$</span>Sensitivity <span class="ot">&lt;-</span> <span class="cn">NA</span></span>
+<span id="cb9-50"><a href="#cb9-50" aria-hidden="true" tabindex="-1"></a>    df1<span class="sc">$</span>Specificity <span class="ot">&lt;-</span> <span class="cn">NA</span></span>
+<span id="cb9-51"><a href="#cb9-51" aria-hidden="true" tabindex="-1"></a>  } </span>
+<span id="cb9-52"><a href="#cb9-52" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-53"><a href="#cb9-53" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (<span class="fu">is.null</span>(df2)) {</span>
+<span id="cb9-54"><a href="#cb9-54" aria-hidden="true" tabindex="-1"></a>    df2<span class="sc">$</span>Accuracy <span class="ot">&lt;-</span> <span class="cn">NA</span></span>
+<span id="cb9-55"><a href="#cb9-55" aria-hidden="true" tabindex="-1"></a>    df2<span class="sc">$</span>Sensitivity <span class="ot">&lt;-</span> <span class="cn">NA</span></span>
+<span id="cb9-56"><a href="#cb9-56" aria-hidden="true" tabindex="-1"></a>    df2<span class="sc">$</span>Specificity <span class="ot">&lt;-</span> <span class="cn">NA</span></span>
+<span id="cb9-57"><a href="#cb9-57" aria-hidden="true" tabindex="-1"></a>  } </span>
+<span id="cb9-58"><a href="#cb9-58" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-59"><a href="#cb9-59" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (<span class="fu">is.null</span>(df3)) {</span>
+<span id="cb9-60"><a href="#cb9-60" aria-hidden="true" tabindex="-1"></a>    df3<span class="sc">$</span>Accuracy <span class="ot">&lt;-</span> <span class="cn">NA</span></span>
+<span id="cb9-61"><a href="#cb9-61" aria-hidden="true" tabindex="-1"></a>    df3<span class="sc">$</span>Sensitivity <span class="ot">&lt;-</span> <span class="cn">NA</span></span>
+<span id="cb9-62"><a href="#cb9-62" aria-hidden="true" tabindex="-1"></a>    df3<span class="sc">$</span>Specificity <span class="ot">&lt;-</span> <span class="cn">NA</span></span>
+<span id="cb9-63"><a href="#cb9-63" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb9-64"><a href="#cb9-64" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-65"><a href="#cb9-65" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Merge all three outputs</span></span>
+<span id="cb9-66"><a href="#cb9-66" aria-hidden="true" tabindex="-1"></a>  merged <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(</span>
+<span id="cb9-67"><a href="#cb9-67" aria-hidden="true" tabindex="-1"></a>    <span class="at">Metric =</span> <span class="fu">c</span>(<span class="st">"Accuracy"</span>, <span class="st">"Sensitivity"</span>, <span class="st">"Specificity"</span>),</span>
+<span id="cb9-68"><a href="#cb9-68" aria-hidden="true" tabindex="-1"></a>    <span class="at">Chang =</span> <span class="fu">c</span>(df1<span class="sc">$</span>Accuracy, df1<span class="sc">$</span>Sensitivity, df1<span class="sc">$</span>Specificity),</span>
+<span id="cb9-69"><a href="#cb9-69" aria-hidden="true" tabindex="-1"></a>    <span class="at">Belsky =</span> <span class="fu">c</span>(df2<span class="sc">$</span>Accuracy, df2<span class="sc">$</span>Sensitivity, df2<span class="sc">$</span>Specificity),</span>
+<span id="cb9-70"><a href="#cb9-70" aria-hidden="true" tabindex="-1"></a>    <span class="at">KDM =</span> <span class="fu">c</span>(df3<span class="sc">$</span>Accuracy, df3<span class="sc">$</span>Sensitivity, df3<span class="sc">$</span>Specificity)</span>
+<span id="cb9-71"><a href="#cb9-71" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb9-72"><a href="#cb9-72" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb9-73"><a href="#cb9-73" aria-hidden="true" tabindex="-1"></a>  merged_dfs[[name]] <span class="ot">&lt;-</span> merged</span>
+<span id="cb9-74"><a href="#cb9-74" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb9-75"><a href="#cb9-75" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-76"><a href="#cb9-76" aria-hidden="true" tabindex="-1"></a><span class="co"># Print the merged data frames</span></span>
+<span id="cb9-77"><a href="#cb9-77" aria-hidden="true" tabindex="-1"></a>merged_dfs</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>$hvigor_96
+       Metric     Chang    Belsky       KDM
+1    Accuracy 0.6787565 0.6165803 0.6315789
+2 Sensitivity 0.8839286 0.8490566 0.8392857
+3 Specificity 0.3950617 0.3333333 0.3333333
+
+$hmoderat_96
+       Metric     Chang    Belsky       KDM
+1    Accuracy 0.6787565 0.6735751 0.6210526
+2 Sensitivity 0.9421488 0.9344262 0.9615385
+3 Specificity 0.2361111 0.2253521 0.2093023
+
+$hwalkup_96
+       Metric     Chang    Belsky       KDM
+1    Accuracy 0.8072917 0.8020833 0.8723404
+2 Sensitivity 0.9507042 0.9503546 0.9473684
+3 Specificity 0.4000000 0.3921569 0.5555556
+
+$hwlkblok_96
+       Metric     Chang    Belsky       KDM
+1    Accuracy 0.5625000 0.5729167 0.6170213
+2 Sensitivity 0.9684211 0.9690722 1.0000000
+3 Specificity 0.1649485 0.1684211 0.2000000
+
+$hbending_96
+       Metric     Chang    Belsky       KDM
+1    Accuracy 0.7409326 0.7409326 0.8526316
+2 Sensitivity 0.9492754 0.9428571 0.9864865
+3 Specificity 0.2181818 0.2075472 0.3809524
+
+$heatdres_96
+       Metric     Chang    Belsky       KDM
+1    Accuracy 0.7616580 0.7564767 0.9052632
+2 Sensitivity 0.9787234 0.9785714 1.0000000
+3 Specificity 0.1730769 0.1698113 0.4000000</code></pre>
+</div>
+</div>
+</section>
+<section id="check-multicollinearity" class="level1">
+<h1>Check Multicollinearity</h1>
+<section id="correlation-matrix" class="level2">
+<h2 class="anchored" data-anchor-id="correlation-matrix">Correlation Matrix</h2>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb11"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Convert factors to dummy variables</span></span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>df_dummies <span class="ot">&lt;-</span> df <span class="sc">%&gt;%</span></span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(poa_chang, poa_belsky, kdm_advance_0_kdm, sex, entryage, income, prace) <span class="sc">%&gt;%</span></span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="fu">across</span>(<span class="fu">where</span>(is.character), <span class="sc">~</span><span class="fu">as.numeric</span>(<span class="fu">as.factor</span>(.x))))</span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a>cor_matrix <span class="ot">&lt;-</span> <span class="fu">cor</span>(df_dummies, <span class="at">use =</span> <span class="st">"pairwise.complete.obs"</span>)</span>
+<span id="cb11-7"><a href="#cb11-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-8"><a href="#cb11-8" aria-hidden="true" tabindex="-1"></a><span class="co"># Plot the correlation matrix</span></span>
+<span id="cb11-9"><a href="#cb11-9" aria-hidden="true" tabindex="-1"></a><span class="fu">corrplot</span>(cor_matrix, <span class="at">title=</span><span class="st">"Correlation Plot"</span>, <span class="at">method =</span> <span class="st">"circle"</span>, <span class="at">addCoef.col =</span> <span class="st">"black"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<p><img src="BinLog_Reg_Template_files/figure-html/unnamed-chunk-6-1.png" class="img-fluid" width="672"></p>
+</div>
+</div>
+</section>
+<section id="vif" class="level2">
+<h2 class="anchored" data-anchor-id="vif">VIF</h2>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb12"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="fu">run_initial_binlog_models_with_vif</span>(df, params<span class="sc">$</span>outcome_list, params<span class="sc">$</span>last_time, params<span class="sc">$</span>first_time)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>$hvigor_96
+$hvigor_96$vif
+                      GVIF Df GVIF^(1/(2*Df))
+poa_chang         2.215762  1        1.488544
+poa_belsky        2.097076  1        1.448129
+kdm_advance_0_kdm 1.412354  1        1.188425
+sex               1.252477  1        1.119141
+entryage          1.158959  1        1.076550
+income            1.205621  1        1.098008
+prace             1.219734  3        1.033660
+hvigor_48         1.254786  1        1.120172
+
+
+$hmoderat_96
+$hmoderat_96$vif
+                      GVIF Df GVIF^(1/(2*Df))
+poa_chang         2.025634  1        1.423248
+poa_belsky        1.846453  1        1.358842
+kdm_advance_0_kdm 1.565846  1        1.251338
+sex               1.121279  1        1.058905
+entryage          1.132817  1        1.064339
+income            1.400076  1        1.183248
+prace             1.278216  3        1.041759
+hmoderat_48       1.249692  1        1.117896
+
+
+$hwalkup_96
+$hwalkup_96$vif
+                      GVIF Df GVIF^(1/(2*Df))
+poa_chang         1.981732  1        1.407740
+poa_belsky        2.038361  1        1.427712
+kdm_advance_0_kdm 1.554951  1        1.246977
+sex               1.276732  1        1.129926
+entryage          1.147398  1        1.071167
+income            1.320496  1        1.149128
+prace             1.323359  3        1.047803
+hwalkup_48        1.300613  1        1.140444
+
+
+$hwlkblok_96
+$hwlkblok_96$vif
+                          GVIF Df GVIF^(1/(2*Df))
+poa_chang         2.851154e+00  1        1.688536
+poa_belsky        2.696430e+00  1        1.642081
+kdm_advance_0_kdm 1.529201e+00  1        1.236609
+sex               1.389087e+06  1     1178.595273
+entryage          1.151020e+00  1        1.072856
+income            1.128933e+00  1        1.062512
+prace             1.482026e+00  3        1.067766
+hwlkblok_48       1.389087e+06  1     1178.595291
+
+
+$hbending_96
+$hbending_96$vif
+                      GVIF Df GVIF^(1/(2*Df))
+poa_chang         2.206054  1        1.485279
+poa_belsky        2.361725  1        1.536790
+kdm_advance_0_kdm 1.392722  1        1.180136
+sex               1.328277  1        1.152509
+entryage          1.230020  1        1.109063
+income            1.279744  1        1.131258
+prace             1.548876  3        1.075646
+hbending_48       1.514359  1        1.230593
+
+
+$heatdres_96
+$heatdres_96$vif
+                       GVIF Df GVIF^(1/(2*Df))
+poa_chang         29.134760  1        5.397662
+poa_belsky        27.304089  1        5.225331
+kdm_advance_0_kdm  5.090881  1        2.256298
+sex               14.893858  1        3.859256
+entryage           3.432366  1        1.852664
+income             9.024009  1        3.003999
+prace             12.010707  3        1.513311
+heatdres_48       29.392844  1        5.421517</code></pre>
+</div>
+</div>
+</section>
+</section>
+<section id="run-stepwise-aic" class="level1">
+<h1>Run Stepwise AIC</h1>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb14"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a><span class="fu">run_stepwise_binlog_model</span>(df, params<span class="sc">$</span>outcome_list, params<span class="sc">$</span>last_time, params<span class="sc">$</span>first_time)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>[1] "For model hvigor_96 , 174 rows were removed due to missing values."
+[1] "For model hmoderat_96 , 174 rows were removed due to missing values."
+[1] "For model hwalkup_96 , 175 rows were removed due to missing values."
+[1] "For model hwlkblok_96 , 175 rows were removed due to missing values."
+[1] "For model hbending_96 , 174 rows were removed due to missing values."
+[1] "For model heatdres_96 , 174 rows were removed due to missing values."</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>$hvigor_96
+      (Intercept)         poa_chang              sexM        poa_belsky 
+        1.6250234        22.3291066        -0.8882948       -26.8892393 
+kdm_advance_0_kdm          entryage            income        praceOther 
+       -0.5909793         0.1823058         0.1754345       -16.3250689 
+     praceUnknown        praceWhite        hvigor_481 
+       -0.3552975         0.1154294         0.4705326 
+
+$hmoderat_96
+           (Intercept)              poa_chang                   sexM 
+            -2.3472194             11.7205798            -23.9485480 
+            poa_belsky      kdm_advance_0_kdm               entryage 
+           -14.8800127             -0.2358775              0.3288041 
+                income             praceOther           praceUnknown 
+             0.3081734            -18.6026333              0.1808503 
+            praceWhite           hmoderat_481         poa_chang:sexM 
+            -0.3691513              0.3733358            -56.7038452 
+       sexM:poa_belsky sexM:kdm_advance_0_kdm 
+            80.9040880             -1.1689456 
+
+$hwalkup_96
+      (Intercept)              sexM kdm_advance_0_kdm          entryage 
+      -3.86901266       -1.67054610       -0.64600267        0.22913563 
+           income        praceOther      praceUnknown        praceWhite 
+       0.04059913      -14.99500665        0.96672063       -0.30998258 
+      hwalkup_481 
+       4.55033984 
+
+$hwlkblok_96
+   (Intercept)      poa_chang           sexM       entryage         income 
+   -12.5383843      8.0273932  -2471.7780797      0.2942389      0.2115351 
+    praceOther   praceUnknown     praceWhite   hwlkblok_481 poa_chang:sexM 
+   -22.2988570      0.7636949      0.5300643    298.8363390   2225.5080633 
+
+$hbending_96
+           (Intercept)              poa_chang                   sexM 
+            21.6978680             14.6157675           -233.7326686 
+            poa_belsky      kdm_advance_0_kdm               entryage 
+           -34.6980339              0.9948181             -0.5988163 
+                income             praceOther           praceUnknown 
+             0.5235273            -25.6177666              4.0294166 
+            praceWhite           hbending_481         poa_chang:sexM 
+             3.1419457             12.4658476           -190.4502716 
+       sexM:poa_belsky sexM:kdm_advance_0_kdm 
+           421.5308066             -2.9394657 
+
+$heatdres_96
+           (Intercept)              poa_chang                   sexM 
+          -102.2192877           -135.5826265             -7.3366546 
+            poa_belsky      kdm_advance_0_kdm               entryage 
+           226.0469975             -0.2284532             -0.1782916 
+                income             praceOther           praceUnknown 
+             1.8785177            -24.0462784              5.5462311 
+            praceWhite           heatdres_481 sexM:kdm_advance_0_kdm 
+            -3.1831759             20.7950151             -4.8138801 </code></pre>
+</div>
+</div>
+</section>
+<section id="optimize-by-chi-square" class="level1">
+<h1>Optimize By Chi Square</h1>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb17"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Example usage:</span></span>
+<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a>initial_models <span class="ot">&lt;-</span> <span class="fu">run_initial_binlog_models</span>(df, params<span class="sc">$</span>outcome_list, params<span class="sc">$</span>last_time,</span>
+<span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a>                                     params<span class="sc">$</span>first_time)</span>
+<span id="cb17-4"><a href="#cb17-4" aria-hidden="true" tabindex="-1"></a>optimized_models <span class="ot">&lt;-</span> <span class="fu">optimize_models_by_chisq</span>(initial_models)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+Call:  glm(formula = as.formula(paste(name_last, "~ poa_chang + poa_belsky + kdm_advance_0_kdm + sex + entryage + income + prace +", 
+    name_base)), family = "binomial", data = oversampled_data, 
+    na.action = na.exclude)
+
+Coefficients:
+      (Intercept)          poa_chang         poa_belsky  kdm_advance_0_kdm  
+         -5.82843           11.07936           -7.02052           -0.44877  
+             sexM           entryage             income         praceOther  
+         -0.69007            0.08350            0.20025          -16.85239  
+     praceUnknown         praceWhite         hvigor_481  
+          0.15859            0.06894            0.78720  
+
+Degrees of Freedom: 145 Total (i.e. Null);  135 Residual
+Null Deviance:      202.4 
+Residual Deviance: 172.1    AIC: 194.1
+
+Call:  glm(formula = as.formula(paste(name_last, "~ poa_chang + poa_belsky + kdm_advance_0_kdm + sex + entryage + income + prace +", 
+    name_base)), family = "binomial", data = oversampled_data, 
+    na.action = na.exclude)
+
+Coefficients:
+      (Intercept)          poa_chang         poa_belsky  kdm_advance_0_kdm  
+          -5.6612             7.3824            -4.4372            -0.5504  
+             sexM           entryage             income         praceOther  
+          -0.1407             0.1399             0.2440           -17.2440  
+     praceUnknown         praceWhite       hmoderat_481  
+          -0.6601             0.2178             0.1281  
+
+Degrees of Freedom: 167 Total (i.e. Null);  157 Residual
+Null Deviance:      232.9 
+Residual Deviance: 203.8    AIC: 225.8
+
+Call:  glm(formula = as.formula(paste(name_last, "~ poa_chang + poa_belsky + kdm_advance_0_kdm + sex + entryage + income + prace +", 
+    name_base)), family = "binomial", data = oversampled_data, 
+    na.action = na.exclude)
+
+Coefficients:
+      (Intercept)          poa_chang         poa_belsky  kdm_advance_0_kdm  
+          -5.4891            -8.5256             9.9368            -0.4104  
+             sexM           entryage             income         praceOther  
+          -0.8078             0.2247             0.1591           -16.2368  
+     praceUnknown         praceWhite        hwalkup_481  
+           1.2953            -0.9104             4.2798  
+
+Degrees of Freedom: 159 Total (i.e. Null);  149 Residual
+Null Deviance:      221.8 
+Residual Deviance: 129.3    AIC: 151.3
+
+Call:  glm(formula = as.formula(paste(name_last, "~ poa_chang + poa_belsky + kdm_advance_0_kdm + sex + entryage + income + prace +", 
+    name_base)), family = "binomial", data = oversampled_data, 
+    na.action = na.exclude)
+
+Coefficients:
+      (Intercept)          poa_chang         poa_belsky  kdm_advance_0_kdm  
+          -1.6837            17.7982           -18.0262            -0.4204  
+             sexM           entryage             income         praceOther  
+         -19.6438             0.1238             0.1201           -18.4935  
+     praceUnknown         praceWhite       hwlkblok_481  
+           1.1438             0.1282            21.5378  
+
+Degrees of Freedom: 169 Total (i.e. Null);  159 Residual
+Null Deviance:      235.7 
+Residual Deviance: 132.7    AIC: 154.7
+
+Call:  glm(formula = as.formula(paste(name_last, "~ poa_chang + poa_belsky + kdm_advance_0_kdm + sex + entryage + income + prace +", 
+    name_base)), family = "binomial", data = oversampled_data, 
+    na.action = na.exclude)
+
+Coefficients:
+      (Intercept)          poa_chang         poa_belsky  kdm_advance_0_kdm  
+          -3.7578            -0.5915             5.0189             0.2658  
+             sexM           entryage             income         praceOther  
+          -1.0759            -0.2448             0.3361           -16.3583  
+     praceUnknown         praceWhite       hbending_481  
+           0.8845             1.4484             5.0624  
+
+Degrees of Freedom: 171 Total (i.e. Null);  161 Residual
+Null Deviance:      238.4 
+Residual Deviance: 140.7    AIC: 162.7
+
+Call:  glm(formula = as.formula(paste(name_last, "~ poa_chang + poa_belsky + kdm_advance_0_kdm + sex + entryage + income + prace +", 
+    name_base)), family = "binomial", data = oversampled_data, 
+    na.action = na.exclude)
+
+Coefficients:
+      (Intercept)          poa_chang         poa_belsky  kdm_advance_0_kdm  
+        -119.9810          -103.2390           219.1703            -1.6562  
+             sexM           entryage             income         praceOther  
+          -6.5954            -0.8089             1.9377           -20.8299  
+     praceUnknown         praceWhite       heatdres_481  
+           7.0831            -2.2611            19.0735  
+
+Degrees of Freedom: 177 Total (i.e. Null);  167 Residual
+Null Deviance:      246.8 
+Residual Deviance: 56.32    AIC: 78.32</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb19"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a>optimized_models</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>$hvigor_96
+
+Call:  glm(formula = as.formula(reduced_formula_str), family = "binomial", 
+    data = model$model)
+
+Coefficients:
+      (Intercept)  kdm_advance_0_kdm               sexM           entryage  
+         -1.66923           -0.37250           -0.48437            0.07384  
+           income         praceOther       praceUnknown         praceWhite  
+          0.22017          -17.13387            0.15647           -0.03785  
+       hvigor_481  
+          0.70213  
+
+Degrees of Freedom: 145 Total (i.e. Null);  137 Residual
+Null Deviance:      202.4 
+Residual Deviance: 176.3    AIC: 194.3
+
+$hmoderat_96
+
+Call:  glm(formula = as.formula(reduced_formula_str), family = "binomial", 
+    data = model$model)
+
+Coefficients:
+      (Intercept)  kdm_advance_0_kdm               sexM           entryage  
+         -2.12127           -0.45940           -0.08883            0.10475  
+           income         praceOther       praceUnknown         praceWhite  
+          0.22170          -17.26601           -0.68579            0.17611  
+     hmoderat_481  
+          0.06165  
+
+Degrees of Freedom: 167 Total (i.e. Null);  159 Residual
+Null Deviance:      232.9 
+Residual Deviance: 206.3    AIC: 224.3
+
+$hwalkup_96
+
+Call:  glm(formula = as.formula(reduced_formula_str), family = "binomial", 
+    data = model$model)
+
+Coefficients:
+      (Intercept)  kdm_advance_0_kdm               sexM           entryage  
+          -4.3185            -0.4762            -0.9258             0.2454  
+           income         praceOther       praceUnknown         praceWhite  
+           0.1649           -16.0706             1.3251            -0.8120  
+      hwalkup_481  
+           3.9495  
+
+Degrees of Freedom: 159 Total (i.e. Null);  151 Residual
+Null Deviance:      221.8 
+Residual Deviance: 130.9    AIC: 148.9
+
+$hwlkblok_96
+
+Call:  glm(formula = as.formula(reduced_formula_str), family = "binomial", 
+    data = model$model)
+
+Coefficients:
+ (Intercept)          sexM      entryage        income    praceOther  
+     -2.7420      -19.4407        0.1938        0.1025      -18.9172  
+praceUnknown    praceWhite  hwlkblok_481  
+      0.9091        0.2971       21.4236  
+
+Degrees of Freedom: 169 Total (i.e. Null);  162 Residual
+Null Deviance:      235.7 
+Residual Deviance: 139.8    AIC: 155.8
+
+$hbending_96
+
+Call:  glm(formula = as.formula(reduced_formula_str), family = "binomial", 
+    data = model$model)
+
+Coefficients:
+ (Intercept)          sexM      entryage        income    praceOther  
+      1.1609       -1.0561       -0.2679        0.3302      -16.3377  
+praceUnknown    praceWhite  hbending_481  
+      0.9005        1.3497        4.4918  
+
+Degrees of Freedom: 171 Total (i.e. Null);  164 Residual
+Null Deviance:      238.4 
+Residual Deviance: 142.8    AIC: 158.8
+
+$heatdres_96
+
+Call:  glm(formula = as.formula(paste(name_last, "~ poa_chang + poa_belsky + kdm_advance_0_kdm + sex + entryage + income + prace +", 
+    name_base)), family = "binomial", data = oversampled_data, 
+    na.action = na.exclude)
+
+Coefficients:
+      (Intercept)          poa_chang         poa_belsky  kdm_advance_0_kdm  
+        -119.9810          -103.2390           219.1703            -1.6562  
+             sexM           entryage             income         praceOther  
+          -6.5954            -0.8089             1.9377           -20.8299  
+     praceUnknown         praceWhite       heatdres_481  
+           7.0831            -2.2611            19.0735  
+
+Degrees of Freedom: 177 Total (i.e. Null);  167 Residual
+Null Deviance:      246.8 
+Residual Deviance: 56.32    AIC: 78.32</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb21"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a><span class="co"># </span></span>
+<span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a><span class="co"># dataframe &lt;- all_poa_risky_cat</span></span>
+<span id="cb21-3"><a href="#cb21-3" aria-hidden="true" tabindex="-1"></a><span class="co"># outcome_list &lt;- getOutcomeNamesCustom(all_poa_risky_cat, suffixes = c(72, 24))</span></span>
+<span id="cb21-4"><a href="#cb21-4" aria-hidden="true" tabindex="-1"></a><span class="co"># last_time &lt;- "72"</span></span>
+<span id="cb21-5"><a href="#cb21-5" aria-hidden="true" tabindex="-1"></a><span class="co"># first_time &lt;- "24"</span></span>
+<span id="cb21-6"><a href="#cb21-6" aria-hidden="true" tabindex="-1"></a><span class="co"># </span></span>
+<span id="cb21-7"><a href="#cb21-7" aria-hidden="true" tabindex="-1"></a><span class="co"># a &lt;- run_initial_binlog_models(all_poa_risky_cat,</span></span>
+<span id="cb21-8"><a href="#cb21-8" aria-hidden="true" tabindex="-1"></a><span class="co">#                           getOutcomeNamesCustom(all_poa_risky_cat, suffixes = c(72, 24)),</span></span>
+<span id="cb21-9"><a href="#cb21-9" aria-hidden="true" tabindex="-1"></a><span class="co">#                           "72", "24")</span></span>
+<span id="cb21-10"><a href="#cb21-10" aria-hidden="true" tabindex="-1"></a><span class="co"># </span></span>
+<span id="cb21-11"><a href="#cb21-11" aria-hidden="true" tabindex="-1"></a><span class="co"># optimize_models_by_chisq(a)</span></span>
+<span id="cb21-12"><a href="#cb21-12" aria-hidden="true" tabindex="-1"></a><span class="co"># </span></span>
+<span id="cb21-13"><a href="#cb21-13" aria-hidden="true" tabindex="-1"></a><span class="co"># </span></span>
+<span id="cb21-14"><a href="#cb21-14" aria-hidden="true" tabindex="-1"></a><span class="co">#   library(pscl)</span></span>
+<span id="cb21-15"><a href="#cb21-15" aria-hidden="true" tabindex="-1"></a><span class="co">#   library(lmtest)</span></span>
+<span id="cb21-16"><a href="#cb21-16" aria-hidden="true" tabindex="-1"></a><span class="co">#   </span></span>
+<span id="cb21-17"><a href="#cb21-17" aria-hidden="true" tabindex="-1"></a><span class="co">#   optimized_list &lt;- list()</span></span>
+<span id="cb21-18"><a href="#cb21-18" aria-hidden="true" tabindex="-1"></a><span class="co">#   </span></span>
+<span id="cb21-19"><a href="#cb21-19" aria-hidden="true" tabindex="-1"></a><span class="co">#   for (name in names(a)) { </span></span>
+<span id="cb21-20"><a href="#cb21-20" aria-hidden="true" tabindex="-1"></a><span class="co">#     model &lt;- model_list[[name]]</span></span>
+<span id="cb21-21"><a href="#cb21-21" aria-hidden="true" tabindex="-1"></a><span class="co">#     </span></span>
+<span id="cb21-22"><a href="#cb21-22" aria-hidden="true" tabindex="-1"></a><span class="co">#     # Extract outcome variable</span></span>
+<span id="cb21-23"><a href="#cb21-23" aria-hidden="true" tabindex="-1"></a><span class="co">#     outcome_var &lt;- all.vars(formula(model))[1]</span></span>
+<span id="cb21-24"><a href="#cb21-24" aria-hidden="true" tabindex="-1"></a><span class="co">#     </span></span>
+<span id="cb21-25"><a href="#cb21-25" aria-hidden="true" tabindex="-1"></a><span class="co">#     # DEBUGGING: Check that the outcome variable exists in the dataset</span></span>
+<span id="cb21-26"><a href="#cb21-26" aria-hidden="true" tabindex="-1"></a><span class="co">#     if (!(outcome_var %in% names(model$model))) {</span></span>
+<span id="cb21-27"><a href="#cb21-27" aria-hidden="true" tabindex="-1"></a><span class="co">#       stop(paste("Error: Outcome variable", outcome_var, "not found in the dataset for model", name))</span></span>
+<span id="cb21-28"><a href="#cb21-28" aria-hidden="true" tabindex="-1"></a><span class="co">#     }</span></span>
+<span id="cb21-29"><a href="#cb21-29" aria-hidden="true" tabindex="-1"></a><span class="co">#     </span></span>
+<span id="cb21-30"><a href="#cb21-30" aria-hidden="true" tabindex="-1"></a><span class="co">#     # Variables to consider for removal</span></span>
+<span id="cb21-31"><a href="#cb21-31" aria-hidden="true" tabindex="-1"></a><span class="co">#     potential_remove_vars &lt;- c("poa_chang", "poa_belsky", "kdm_advance_0_kdm")</span></span>
+<span id="cb21-32"><a href="#cb21-32" aria-hidden="true" tabindex="-1"></a><span class="co">#     current_vars &lt;- setdiff(all.vars(formula(model)), outcome_var)</span></span>
+<span id="cb21-33"><a href="#cb21-33" aria-hidden="true" tabindex="-1"></a><span class="co">#     </span></span>
+<span id="cb21-34"><a href="#cb21-34" aria-hidden="true" tabindex="-1"></a><span class="co">#     changed &lt;- TRUE</span></span>
+<span id="cb21-35"><a href="#cb21-35" aria-hidden="true" tabindex="-1"></a><span class="co">#     </span></span>
+<span id="cb21-36"><a href="#cb21-36" aria-hidden="true" tabindex="-1"></a><span class="co">#     while(changed) {</span></span>
+<span id="cb21-37"><a href="#cb21-37" aria-hidden="true" tabindex="-1"></a><span class="co">#       changed &lt;- FALSE</span></span>
+<span id="cb21-38"><a href="#cb21-38" aria-hidden="true" tabindex="-1"></a><span class="co">#       </span></span>
+<span id="cb21-39"><a href="#cb21-39" aria-hidden="true" tabindex="-1"></a><span class="co">#       # Try removing variables</span></span>
+<span id="cb21-40"><a href="#cb21-40" aria-hidden="true" tabindex="-1"></a><span class="co">#       for (var in potential_remove_vars) {</span></span>
+<span id="cb21-41"><a href="#cb21-41" aria-hidden="true" tabindex="-1"></a><span class="co">#         if (var %in% current_vars) {</span></span>
+<span id="cb21-42"><a href="#cb21-42" aria-hidden="true" tabindex="-1"></a><span class="co">#           # Construct formula without the variable to be removed</span></span>
+<span id="cb21-43"><a href="#cb21-43" aria-hidden="true" tabindex="-1"></a><span class="co">#           reduced_formula_str &lt;- paste(outcome_var, "~", paste(setdiff(current_vars, var), collapse = " + "))</span></span>
+<span id="cb21-44"><a href="#cb21-44" aria-hidden="true" tabindex="-1"></a><span class="co">#           reduced_model &lt;- glm(as.formula(reduced_formula_str), data = model$model, family = "binomial")</span></span>
+<span id="cb21-45"><a href="#cb21-45" aria-hidden="true" tabindex="-1"></a><span class="co">#           </span></span>
+<span id="cb21-46"><a href="#cb21-46" aria-hidden="true" tabindex="-1"></a><span class="co">#           # Compare models using anova for GLMs (Likelihood ratio test)</span></span>
+<span id="cb21-47"><a href="#cb21-47" aria-hidden="true" tabindex="-1"></a><span class="co">#           comparison &lt;- anova(reduced_model, model, test = "Chisq")</span></span>
+<span id="cb21-48"><a href="#cb21-48" aria-hidden="true" tabindex="-1"></a><span class="co">#           p_value &lt;- comparison$`Pr(&gt;Chi)`[2]</span></span>
+<span id="cb21-49"><a href="#cb21-49" aria-hidden="true" tabindex="-1"></a><span class="co">#   </span></span>
+<span id="cb21-50"><a href="#cb21-50" aria-hidden="true" tabindex="-1"></a><span class="co">#           # If p-value is large, then the reduced model is not significantly worse</span></span>
+<span id="cb21-51"><a href="#cb21-51" aria-hidden="true" tabindex="-1"></a><span class="co">#           if (p_value &gt; 0.05) {</span></span>
+<span id="cb21-52"><a href="#cb21-52" aria-hidden="true" tabindex="-1"></a><span class="co">#             model &lt;- reduced_model</span></span>
+<span id="cb21-53"><a href="#cb21-53" aria-hidden="true" tabindex="-1"></a><span class="co">#             current_vars &lt;- setdiff(all.vars(formula(model)), outcome_var)</span></span>
+<span id="cb21-54"><a href="#cb21-54" aria-hidden="true" tabindex="-1"></a><span class="co">#             changed &lt;- TRUE</span></span>
+<span id="cb21-55"><a href="#cb21-55" aria-hidden="true" tabindex="-1"></a><span class="co">#           }</span></span>
+<span id="cb21-56"><a href="#cb21-56" aria-hidden="true" tabindex="-1"></a><span class="co">#         }</span></span>
+<span id="cb21-57"><a href="#cb21-57" aria-hidden="true" tabindex="-1"></a><span class="co">#       }</span></span>
+<span id="cb21-58"><a href="#cb21-58" aria-hidden="true" tabindex="-1"></a><span class="co">#     }</span></span>
+<span id="cb21-59"><a href="#cb21-59" aria-hidden="true" tabindex="-1"></a><span class="co">#     </span></span>
+<span id="cb21-60"><a href="#cb21-60" aria-hidden="true" tabindex="-1"></a><span class="co">#     optimized_list[[name]] &lt;- model</span></span>
+<span id="cb21-61"><a href="#cb21-61" aria-hidden="true" tabindex="-1"></a><span class="co">#   }</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</section>
+<section id="show-visuals" class="level1">
+<h1>Show Visuals</h1>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb22"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a>plots_lists <span class="ot">&lt;-</span> <span class="fu">create_combined_plots</span>(<span class="at">dataframe =</span> df, <span class="at">outcome_names =</span> params<span class="sc">$</span>outcome_list, </span>
+<span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a>                                     <span class="at">last_time =</span> <span class="fu">paste0</span>(<span class="st">"_"</span>, params<span class="sc">$</span>last_time))</span>
+<span id="cb22-3"><a href="#cb22-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb22-4"><a href="#cb22-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb22-5"><a href="#cb22-5" aria-hidden="true" tabindex="-1"></a><span class="co"># To display the plots for each outcome variable</span></span>
+<span id="cb22-6"><a href="#cb22-6" aria-hidden="true" tabindex="-1"></a>outcome_vars <span class="ot">&lt;-</span> <span class="fu">paste0</span>(params<span class="sc">$</span>outcome_list, <span class="st">"_"</span>, params<span class="sc">$</span>last_time)</span>
+<span id="cb22-7"><a href="#cb22-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb22-8"><a href="#cb22-8" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb22-9"><a href="#cb22-9" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> (outcome_name <span class="cf">in</span> outcome_vars) {</span>
+<span id="cb22-10"><a href="#cb22-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">grid.arrange</span>(<span class="at">grobs =</span> plots_lists[[outcome_name]], <span class="at">ncol =</span> <span class="dv">2</span>)  <span class="co"># Adjust the number of columns as needed</span></span>
+<span id="cb22-11"><a href="#cb22-11" aria-hidden="true" tabindex="-1"></a>}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<p><img src="BinLog_Reg_Template_files/figure-html/unnamed-chunk-10-1.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="BinLog_Reg_Template_files/figure-html/unnamed-chunk-10-2.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="BinLog_Reg_Template_files/figure-html/unnamed-chunk-10-3.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="BinLog_Reg_Template_files/figure-html/unnamed-chunk-10-4.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="BinLog_Reg_Template_files/figure-html/unnamed-chunk-10-5.png" class="img-fluid" width="672"></p>
+</div>
+<div class="cell-output-display">
+<p><img src="BinLog_Reg_Template_files/figure-html/unnamed-chunk-10-6.png" class="img-fluid" width="672"></p>
+</div>
+</div>
+</section>
+
+</main>
+<!-- /main column -->
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const isCodeAnnotation = (el) => {
+    for (const clz of el.classList) {
+      if (clz.startsWith('code-annotation-')) {                     
+        return true;
+      }
+    }
+    return false;
+  }
+  const clipboard = new window.ClipboardJS('.code-copy-button', {
+    text: function(trigger) {
+      const codeEl = trigger.previousElementSibling.cloneNode(true);
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+  });
+  clipboard.on('success', function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  });
+  function tippyHover(el, contentFn) {
+    const config = {
+      allowHTML: true,
+      content: contentFn,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start'
+    };
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      return note.innerHTML;
+    });
+  }
+      let selectedAnnoteEl;
+      const selectorForAnnotation = ( cell, annotation) => {
+        let cellAttr = 'data-code-cell="' + cell + '"';
+        let lineAttr = 'data-code-annotation="' +  annotation + '"';
+        const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+        return selector;
+      }
+      const selectCodeLines = (annoteEl) => {
+        const doc = window.document;
+        const targetCell = annoteEl.getAttribute("data-target-cell");
+        const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+        const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+        const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+        const lineIds = lines.map((line) => {
+          return targetCell + "-" + line;
+        })
+        let top = null;
+        let height = null;
+        let parent = null;
+        if (lineIds.length > 0) {
+            //compute the position of the single el (top and bottom and make a div)
+            const el = window.document.getElementById(lineIds[0]);
+            top = el.offsetTop;
+            height = el.offsetHeight;
+            parent = el.parentElement.parentElement;
+          if (lineIds.length > 1) {
+            const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+            const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+            height = bottom - top;
+          }
+          if (top !== null && height !== null && parent !== null) {
+            // cook up a div (if necessary) and position it 
+            let div = window.document.getElementById("code-annotation-line-highlight");
+            if (div === null) {
+              div = window.document.createElement("div");
+              div.setAttribute("id", "code-annotation-line-highlight");
+              div.style.position = 'absolute';
+              parent.appendChild(div);
+            }
+            div.style.top = top - 2 + "px";
+            div.style.height = height + 4 + "px";
+            let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+            if (gutterDiv === null) {
+              gutterDiv = window.document.createElement("div");
+              gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+              gutterDiv.style.position = 'absolute';
+              const codeCell = window.document.getElementById(targetCell);
+              const gutter = codeCell.querySelector('.code-annotation-gutter');
+              gutter.appendChild(gutterDiv);
+            }
+            gutterDiv.style.top = top - 2 + "px";
+            gutterDiv.style.height = height + 4 + "px";
+          }
+          selectedAnnoteEl = annoteEl;
+        }
+      };
+      const unselectCodeLines = () => {
+        const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+        elementsIds.forEach((elId) => {
+          const div = window.document.getElementById(elId);
+          if (div) {
+            div.remove();
+          }
+        });
+        selectedAnnoteEl = undefined;
+      };
+      // Attach click handler to the DT
+      const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+      for (const annoteDlNode of annoteDls) {
+        annoteDlNode.addEventListener('click', (event) => {
+          const clickedEl = event.target;
+          if (clickedEl !== selectedAnnoteEl) {
+            unselectCodeLines();
+            const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+            if (activeEl) {
+              activeEl.classList.remove('code-annotation-active');
+            }
+            selectCodeLines(clickedEl);
+            clickedEl.classList.add('code-annotation-active');
+          } else {
+            // Unselect the line
+            unselectCodeLines();
+            clickedEl.classList.remove('code-annotation-active');
+          }
+        });
+      }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+</div> <!-- /content -->
+
+
+
+</body></html>
