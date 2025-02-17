@@ -1,0 +1,1147 @@
+---
+title: "Biomarker_Cleaning"
+output:
+  html_document:
+    toc: true
+    theme: united
+date: "2023-06-28"
+---
+
+This file reads in the merged biomarker file and cleans the data for modelling. This file also cleans the viral load data.
+
+Read in:
+
+  * m4_dem.csv
+  * m4_fin.csv
+  * f3109.sas7bdat (viral load)
+  * hxw0101.sas7bdat
+
+Output: 
+
+  * ivs_stand_flipped.csv (Participant and Biomarker Data ready for modelling)
+
+  * ivs_stand_flipped.csv (csv file of biomarkers and participant info ready for modelling)
+
+
+# Libraries
+```{r, echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+# library(MASS)
+library("skimr")
+library("dplyr")
+library("RcmdrMisc")
+library("haven")
+library("sjPlot")
+library(ggplot2)
+library(purrr)
+library(tidyr)
+library(ggrepel)
+library(corrplot)
+library(dplyr)
+```
+
+# Import Data 
+```{r}
+m4_dem <- read.csv(paste0(root, "/Exported_Data/m4_dem.csv"))
+m4_fin <- read.csv(paste0(root, "/Exported_Data/m4_fin.csv"))
+
+v_load <- read_sas(paste0(root, "/data/f3109.sas7bdat"))
+hxw <- read_sas(paste0(root, "/data/hxw0101.sas7bdat"))
+
+```
+
+
+# Merge Biomarkers and Demographic
+```{r}
+bm_dem <- merge(m4_fin, m4_dem, by = c("publicID", "week"))
+
+skim(bm_dem)
+```
+
+# Check Viral Load and Maximum Viral load
+```{r}
+
+skim(hxw)
+skim(hxw_old)
+
+```
+There are duplicates in the v_load data. Let's find them and get only the most recent of the duplicates
+
+
+
+```{r}
+hist(v_load$week)
+table(v_load$week)
+skim(v_load)
+skim(v_load_old)
+```
+
+
+# Find duplicate in HIV Viral Load data
+```{r}
+# Get duplicates
+duplicates <- v_load %>%
+  group_by(publicID, week) %>%
+  filter(duplicated(publicID, week) | duplicated(publicID, week, fromLast = TRUE))
+
+# Ungroup the duplicates data frame
+ungrouped_duplicates <- duplicates %>% 
+  ungroup()
+
+# Filter ungrouped duplicates to select complete rows
+complete_rows_duplicates <- ungrouped_duplicates %>%
+  filter(complete.cases(.))
+
+# Select the row with the higher value of specage for each duplicate
+selected_rows <- complete_rows_duplicates %>%
+  group_by(publicID, week) %>%
+  slice(which.max(specage))
+
+selected_rows
+```
+
+# Anti-Join and Re-Join HIV Viral Load
+```{r}
+# Perform anti-join
+anti_1 <- anti_join(v_load, duplicates, by = c("publicID", "week"))
+rejoin_1 <- rbind(anti_1, selected_rows)
+
+# Check to see that all duplicates are gone
+rejoin_1 %>%
+  group_by(publicID, week) %>%
+  filter(duplicated(publicID, week) | duplicated(publicID, week, fromLast = TRUE))
+```
+rejoin_1 is the no-duplicates HIV viral load dataframe.
+
+
+# Merge Viral Load and Maximum Viral load
+```{r}
+vl_pres_past <- merge(rejoin_1, hxw, by = c("publicID"))
+
+```
+This data frame has both current viral load and past peak viral load and CD4 counts. 
+
+# Merge bm_dem and vl_pres_past
+```{r}
+vl_pres_past$week <- vl_pres_past$week.x
+ivs <- merge(bm_dem, vl_pres_past, by = c("publicID", "week"))
+
+skim(ivs)
+```
+
+# Check and Remove Duplicates
+Take the most updated Marker
+```{r}
+ivs %>%
+  group_by(publicID, week) %>%
+  filter(n() > 1)
+
+```
+
+## See Trajectories of each biomarker
+```{r}
+# # Split between male and female for standardization
+# ivs_m <- ivs %>% filter(sex == "M") 
+# ivs_f <- ivs %>% filter(sex == "F") 
+# 
+# # Standardize the columns within the specified range
+# ivs_stand_m <- ivs_m %>%
+#   mutate(across(syst_avg:mwaist_avg, scale))
+# 
+# ivs_stand_f <- ivs_f %>%
+#   mutate(across(syst_avg:mwaist_avg, scale))
+# 
+# ivs_stand <- rbind(ivs_stand_m, ivs_stand_f)
+# 
+# # Make Weeks a factor
+# ivs_stand$week_fac <- as.factor(ivs_stand$week)
+# 
+# # New data frame with averages
+# avg_ivs_stand <- ivs_stand %>%
+#   group_by(week) %>%
+#   summarize(across(syst_avg:mwaist_avg, mean, na.rm = TRUE))
+# 
+# # Reshape the data into long format
+# avg_ivs_stand_long <- avg_ivs_stand %>% gather(biomarker, value, syst_avg:mwaist_avg)
+# 
+# # Choose the time point for labeling (e.g., week 96)
+# label_time <- 96
+# 
+# # Filter the data to include only the chosen time point
+# avg_ivs_stand_long_labels <- avg_ivs_stand_long %>% filter(week == label_time)
+# 
+# # Plot the overlayed biomarker values over time with direct labels
+# ggplot(avg_ivs_stand_long, aes(x = week, y = value, color = biomarker)) +
+#   geom_line() +
+#   xlab("Week") +
+#   ylab("Biomarker Value") +
+#   ggtitle("Overlayed Biomarker Values over Time")
+
+```
+
+# Graph only biomarkers with a negative slope
+```{r}
+# avg_ivs_stand
+# 
+# #Any negative values here have a negative slope (gets lower with age)
+# avg_ivs_stand %>% 
+#   filter(week == 0 | week == 96) %>%
+#   summarize(across(syst_avg:mwaist_avg, ~ .[week == 96] - .[week == 0]))
+# 
+# # Reshape the data into long format
+# 
+# neg_cols <- avg_ivs_stand %>% select(week, sgotval, bunval, ckval, ftcval, ftgval, fldlval, fhdlval, 
+#                                      hemocv, mcv, wbccv, lymph, mono, eosin, baso, platcv, alympcnt) 
+# 
+# # Reshape the data into long format
+# avg_ivs_stand_long_neg <- neg_cols %>% gather(biomarker, value, sgotval:alympcnt)
+# 
+# # Plot the overlayed biomarker values over time with direct labels
+# ggplot(avg_ivs_stand_long_neg, aes(x = week, y = value, color = biomarker)) +
+#   geom_line() +
+#   xlab("Week") +
+#   ylab("Biomarker Value") +
+#   ggtitle("Overlayed Biomarker Values over Time")
+
+```
+
+# Find Correlation between each biomarker and age. 
+Take out any that are very weakly correlated (0.1 or less)
+```{r}
+colnames(ivs)
+ivs <- ivs %>%
+  mutate(across(c(specage.y, syst_avg:mwaist_avg), as.numeric))
+# Select the specific column and range of columns
+selected_columns <- ivs %>%
+  select(specage.y, syst_avg:mwaist_avg, -study)
+
+# Calculate the correlation matrix
+cor_matrix <- cor(selected_columns,method = "spearman", use = "pairwise.complete.obs")
+cor_table <- as.data.frame(as.table(cor_matrix))
+
+cor_table
+
+cor.test(ivs$anccv, ivs$wbccv, method = "spearman", use = "pairwise.complete.obs")
+ivs %>% select(anccv, wbccv) %>% filter(complete.cases(.))
+
+
+cor_table_age <- cor_table %>% 
+  filter(Var1 == "specage.y") %>% 
+  arrange(abs(Freq))
+
+median(abs(cor_table_age$Freq))
+
+# Subset the top half of correlation
+subset(cor_table_age, abs(Freq) <= median(abs(cor_table_age$Freq)))
+
+# Get list of not very correlated biomarkers
+bms_not_cor_list <- subset(cor_table_age, abs(Freq) <= median(abs(cor_table_age$Freq))) %>%
+  pull(Var2)
+
+```
+
+
+## Correlation matrix of Inflammation and Infections BM's
+```{r}
+# cor_matrix <- cor(ivs %>% select(lipval,rbc,mcv, anccv, lymph, platcv, hema, wbccv), 
+#                   method = "spearman", use = "pairwise.complete.obs")
+
+cor_matrix <- cor(ivs %>% select(syst_avg:mwaist_avg, -study), 
+                  method = "spearman", use = "pairwise.complete.obs")
+
+# Define your own list of strings for variable names
+# new_variable_names <- c("Lipase Value", "Red Blood Cell Count", "Mean Corpuscular Volume", "Neutrophil Value", "Lymphocyte Value", "Platelet Value", "Hematocrit Value", "White Blood Cell Count")
+
+# Rename the column names of the correlation matrix
+# colnames(cor_matrix) <- new_variable_names
+# rownames(cor_matrix) <- new_variable_names
+
+# Define the row names and groups
+row_names <- rownames(cor_matrix)
+groups <- c("Included", "Excluded")  # Specify your groups here
+
+# Create a custom color palette for the groups
+group_colors <- c("Group1" = "red", "Group2" = "blue")  # Define colors for each group
+
+# Map row names to corresponding colors
+row_colors <- group_colors[groups]
+
+# Use corrplot to create a colored correlation matrix with renamed variables
+corrplot(cor_matrix, method = "color", type = "upper", order = "hclust",
+         tl.col = "black", tl.srt = 45, tl.cex = 0.7,  # Adjust label size (0.7)
+         addCoef.col = "black", 
+         number.cex = 0.3,
+         diag = FALSE,
+         width = 0.6)  # Adjust cell width (0.6)
+ 
+```
+
+
+## Graph Correlation by Chronological Age at Baseline
+This deals with independence of correlation assumption
+```{r}
+cor_assump_cols <- ivs %>% 
+  filter(week == 0) %>%
+  select(specage.y, syst_avg:mwaist_avg)
+
+# Calculate the correlation matrix
+cor_matrix <- cor(cor_assump_cols,method = "spearman", use = "pairwise.complete.obs") 
+cor_table <- as.data.frame(as.table(cor_matrix))
+
+subset(cor_table, abs(Freq) <= 0.07) %>% arrange(Freq) %>% filter(grepl("specage.y", Var1))
+
+
+```
+From baseline, BM's that have a correlation with CA less than 0.07:
+
+  * baso
+  * ckval
+  * bunval
+  * wbccv
+  * mono 
+  * sgptval
+
+
+Take out 
+
+  * baso
+  * mono
+  * wbccv
+
+
+
+# Correlations of biomarkers
+```{r}
+ivs <- ivs %>% mutate_at(vars(syst_avg:bmi), as.double)
+
+# from correlation with chronological age
+ivs_removed <- ivs %>% select(-c(mwaist_avg, weight_avg, height_avg, baso, mono, wbccv))
+
+cor_matrix <- cor(ivs_removed %>% select(syst_avg:bmi), method = "spearman", use = "pairwise.complete.obs")
+
+cor_table <- as.data.frame(as.table(cor_matrix))
+subset(cor_table, abs(Freq) > 0.8) %>% arrange(Freq)
+
+cor.test(ivs$hema, ivs$hemocv, method = "spearman", use = "pairwise.complete.obs")
+cor.test(ivs$fldlval, ivs$ftcval, method = "spearman", use = "pairwise.complete.obs")
+
+```
+In choosing which one to take out, look at the trajectories... If it is more linear, then keep that one
+
+
+
+## Find correlation at baseline 
+This deals with independence of correlation assumption
+```{r}
+cor_assump_cols_bm_only <- cor_assump_cols %>% mutate_at(vars(syst_avg:mwaist_avg), as.double)
+cor_assump_cols_bm_only <- cor_assump_cols_bm_only %>% select(-specage.y)
+
+cor_matrix <- cor(cor_assump_cols_bm_only %>% select(syst_avg:mwaist_avg), 
+                  method = "spearman", use = "pairwise.complete.obs")
+
+cor_table <- as.data.frame(as.table(cor_matrix))
+subset(cor_table, abs(Freq) > 0.8) %>% arrange(Freq)
+
+```
+
+
+Take out:
+
+  * lymph
+  * anccv
+  * hema
+  * height
+  * weight
+
+
+# Final List of Biomarkers
+
+Take out:  
+
+  * Low correlation with age
+    + baso
+    + mono
+    + wbccv
+  * High correlation with other BM
+    + lymph
+    + anccv
+    + hema
+    + height
+    + weight
+    
+# Remove Outliers in Baseline
+There are a lot of extreme upper values. Get rid of them in baseline since we will standardize based on baseline. 
+```{r}
+ivs_bm_names <- ivs %>% dplyr::select(c(syst_avg:mwaist_avg, -alympcnt)) %>% names()
+
+for (bm in ivs_bm_names) {
+  
+  hist(ivs %>% select(bm))
+}
+
+
+# Step 1: Scale the values within each column 
+scaled_ivs <- ivs %>%
+  mutate(across(c(syst_avg:bmi, -alympcnt), scale))
+
+# Step 2: Replace values greater than the absolute value of 4 with NA
+scaled_ivs <- scaled_ivs %>%
+  mutate(across(c(syst_avg:bmi), ~ ifelse(abs(.) > 4, NA, .)))
+
+for (bm in ivs_bm_names) {
+  
+  hist(scaled_ivs %>% select(bm))
+}
+
+
+```
+
+
+# Backwards Selection 
+## V3
+```{r}
+scaled_ivs
+
+scaled_ivs_comp <- scaled_ivs %>% 
+  dplyr::select(syst_avg:platcv, weight_avg:mwaist_avg, specage.y, -study) 
+
+scaled_ivs_comp <- scaled_ivs_comp %>%
+  mutate_all(function(x) if_else(is.na(x), mean(x, na.rm = TRUE), x))
+
+scaled_ivs_comp
+
+
+# Backward Selection using step function with AIC
+# Perform backward selection
+model <- lm(formula = specage.y ~ ., 
+              data = scaled_ivs_comp) 
+
+# Assuming 'model' is already defined as you mentioned
+# Specify the formula and data for the initial model
+initial_formula <- formula(model)
+initial_formula
+
+library(MASS)
+# Perform stepwise selection with AIC in both directions
+final_model <- stepAIC(model, direction = "backward")
+
+# Print the final selected model
+summary(final_model)
+
+
+# Get Final List
+stepaic_list <- all.vars(final_formula)[-1]
+scaled_ivs_comp %>% names()
+stepaic_list
+
+setdiff(scaled_ivs_comp %>% names(), stepaic_list)
+
+detach("package:MASS", unload= TRUE)
+```
+
+
+# Take out selected BM's and standardize
+Standardization will be based on the baseline value.
+```{r}
+ivs$map <- (2 * ivs$dia_avg + ivs$syst_avg) / 3
+
+ivs<- ivs %>%
+  relocate(map, .before = mwaist_avg)
+
+ivs_removed <- ivs %>% select(-c(baso, mono, wbccv, lymph, anccv, hema, 
+                                             height_avg, weight_avg, dia_avg, syst_avg))
+
+list_v2_remove <- union(c("baso", "mono", "wbccv", "lymph", "anccv", "hema", "height_avg", 
+                          "weight_avg", "dia_avg", "syst_avg"),
+                        bms_not_cor_list)
+
+
+ivs_removed_v2 <- ivs %>% select(-list_v2_remove)
+
+# Step AIC Selected
+ivs_bm_all_names <- ivs %>% select(syst_avg:alympcnt, weight_avg:mwaist_avg) %>% names()
+
+ivs_removed_v3 <- ivs %>% 
+  select(-c(setdiff(ivs_bm_all_names,stepaic_list)))
+
+```
+
+
+Final List of Biomarkers:
+
+V3:
+Metabolic Markers:
+- Fasting Triglycerides Value
+- Fasting HDL Cholesterol Value
+
+Markers of Inflammation and Infection:
+- Absolute Neutrophil Count
+- Eosinphil Percentage
+- Absolute Platelets Value
+
+Markers of Organ Function
+- Alanine Aminotransferase (ALT/SGPT) Value
+- Aspartate Aminotransferase (AST/SGOT) Value
+- Blood Urea Nitrogen (BUN) (mg/dl)
+- Serum Creatinine Kinase 
+- Creatine Kinase Value
+
+Cardiovascular Markers
+- Systolic Average
+- Diastolic Average
+- MAP
+
+Anthropometric Markers
+- BMI
+- Weight
+- Height
+
+BM's Taken out:
+- lipval
+- fldlval
+- hemocv
+- rbc
+- mcv
+- ftcval
+
+
+
+
+
+
+
+
+## Scale Biomarkers Function
+```{r}
+scale_biomarkers <- function(data, bms) {
+    # Split between male and female for standardization
+  # Standardization 
+  ivs_m_v2 <- data %>% filter(sex == "M") 
+  ivs_f_v2 <- data %>% filter(sex == "F") 
+  
+  # Columns to standardize (excluding the 'week' column)
+  biomarker_cols_v2 <- ivs_m_v2 %>% select(bms) %>% names()
+  
+  ivs_m_0_v2 <- ivs_m_v2 %>% filter(week == 0)
+  ivs_f_0_v2 <- ivs_f_v2 %>% filter(week == 0)
+  # Extract the mean and standard deviation for each column at week 0
+  ivs_m_0_summary_v2 <- ivs_m_0_v2 %>%
+    summarize(across(bms, list(mean = ~ mean(., na.rm = TRUE), 
+                                               sd = ~ sd(., na.rm = TRUE))))
+  ivs_f_0_summary_v2 <- ivs_f_0_v2 %>%
+    summarize(across(bms, list(mean = ~ mean(., na.rm = TRUE), 
+                                               sd = ~ sd(., na.rm = TRUE))))
+  
+  
+  scale_column <- function(x, mean_val, sd_val) {
+    (x - mean_val) / sd_val
+  }
+  
+  ivs_m_scale_v2 <- ivs_m_v2
+  ivs_f_scale_v2 <- ivs_f_v2
+  
+  
+  # For loop to scale each column based on mean and sd at baseline
+  for (bm in bms) {
+    
+    # Males
+    mean_val_m_v2 <- ivs_m_0_summary_v2 %>%
+      select(matches(paste0(bm, "_mean")))
+    sd_val_m_v2 <- ivs_m_0_summary_v2 %>%
+      select(matches(paste0(bm, "_sd")))
+    
+    # Females
+    mean_val_f_v2 <- ivs_f_0_summary_v2 %>%
+      select(matches(paste0(bm, "_mean")))
+    sd_val_f_v2 <- ivs_f_0_summary_v2 %>%
+      select(matches(paste0(bm, "_sd")))
+    
+    # Scale the selected columns using mutate_at
+    ivs_m_scale_v2 <- ivs_m_scale_v2 %>%
+      mutate_at(vars(all_of(bm)), ~ scale_column(., mean_val_m_v2[1,1], sd_val_m_v2[1,1]))
+    ivs_f_scale_v2 <- ivs_f_scale_v2 %>%
+      mutate_at(vars(all_of(bm)), ~ scale_column(., mean_val_f_v2[1,1], sd_val_f_v2[1,1]))
+  
+  }
+  
+  # Final scaled dataframe
+  ivs_stand_v2 <- rbind(ivs_m_scale_v2, ivs_f_scale_v2)
+  
+  return(ivs_stand_v2)
+}
+
+
+```
+
+
+
+## Standardize V1
+```{r}
+
+# Split between male and female for standardization
+# Standardization 
+ivs_m <- ivs_removed %>% filter(sex == "M") 
+ivs_f <- ivs_removed %>% filter(sex == "F") 
+
+# Columns to standardize (excluding the 'week' column)
+biomarker_cols <- ivs_m %>% select(sgptval:mwaist_avg) %>% names()
+
+ivs_m_0 <- ivs_m %>% filter(week == 0)
+ivs_f_0 <- ivs_f %>% filter(week == 0)
+
+# Extract the mean and standard deviation for each column at week 0
+ivs_m_0_summary <- ivs_m_0 %>%
+  summarize(across(sgptval:mwaist_avg, list(mean = ~ mean(., na.rm = TRUE), 
+                                             sd = ~ sd(., na.rm = TRUE))))
+ivs_f_0_summary <- ivs_f_0 %>%
+  summarize(across(sgptval:mwaist_avg, list(mean = ~ mean(., na.rm = TRUE), 
+                                             sd = ~ sd(., na.rm = TRUE))))
+
+
+scale_column <- function(x, mean_val, sd_val) {
+  (x - mean_val) / sd_val
+}
+
+ivs_m_scale <- ivs_m
+ivs_f_scale <- ivs_f
+
+# For loop to scale each column based on mean and sd at baseline
+for (bm in biomarker_cols) {
+  
+  # Males
+  mean_val_m <- ivs_m_0_summary %>%
+    select(matches(paste0(bm, "_mean")))
+  sd_val_m <- ivs_m_0_summary %>%
+    select(matches(paste0(bm, "_sd")))
+  
+  # Females
+  mean_val_f <- ivs_f_0_summary %>%
+    select(matches(paste0(bm, "_mean")))
+  sd_val_f <- ivs_f_0_summary %>%
+    select(matches(paste0(bm, "_sd")))
+  
+  # Scale the selected columns using mutate_at
+  ivs_m_scale <- ivs_m_scale %>%
+    mutate_at(vars(all_of(bm)), ~ scale_column(., mean_val_m[1,1], sd_val_m[1,1]))
+  ivs_f_scale <- ivs_f_scale %>%
+    mutate_at(vars(all_of(bm)), ~ scale_column(., mean_val_f[1,1], sd_val_f[1,1]))
+
+}
+
+# Final scaled dataframe
+ivs_stand <- rbind(ivs_m_scale, ivs_f_scale)
+
+```
+
+## Standardize V2
+```{r}
+
+# Split between male and female for standardization
+# Standardization 
+ivs_m_v2 <- ivs_removed_v2 %>% filter(sex == "M") 
+ivs_f_v2 <- ivs_removed_v2 %>% filter(sex == "F") 
+
+# Columns to standardize (excluding the 'week' column)
+biomarker_cols_v2 <- ivs_m_v2 %>% select(cretval:platcv, bmi:mwaist_avg) %>% names()
+
+ivs_m_0_v2 <- ivs_m_v2 %>% filter(week == 0)
+ivs_f_0_v2 <- ivs_f_v2 %>% filter(week == 0)
+# Extract the mean and standard deviation for each column at week 0
+ivs_m_0_summary_v2 <- ivs_m_0_v2 %>%
+  summarize(across(c(cretval:platcv, bmi:mwaist_avg), list(mean = ~ mean(., na.rm = TRUE), 
+                                             sd = ~ sd(., na.rm = TRUE))))
+ivs_f_0_summary_v2 <- ivs_f_0_v2 %>%
+  summarize(across(c(cretval:platcv, bmi:mwaist_avg), list(mean = ~ mean(., na.rm = TRUE), 
+                                             sd = ~ sd(., na.rm = TRUE))))
+
+
+scale_column <- function(x, mean_val, sd_val) {
+  (x - mean_val) / sd_val
+}
+
+ivs_m_scale_v2 <- ivs_m_v2
+ivs_f_scale_v2 <- ivs_f_v2
+
+
+# For loop to scale each column based on mean and sd at baseline
+for (bm in biomarker_cols_v2) {
+  
+  # Males
+  mean_val_m_v2 <- ivs_m_0_summary_v2 %>%
+    select(matches(paste0(bm, "_mean")))
+  sd_val_m_v2 <- ivs_m_0_summary_v2 %>%
+    select(matches(paste0(bm, "_sd")))
+  
+  # Females
+  mean_val_f_v2 <- ivs_f_0_summary_v2 %>%
+    select(matches(paste0(bm, "_mean")))
+  sd_val_f_v2 <- ivs_f_0_summary_v2 %>%
+    select(matches(paste0(bm, "_sd")))
+  
+  # Scale the selected columns using mutate_at
+  ivs_m_scale_v2 <- ivs_m_scale_v2 %>%
+    mutate_at(vars(all_of(bm)), ~ scale_column(., mean_val_m_v2[1,1], sd_val_m_v2[1,1]))
+  ivs_f_scale_v2 <- ivs_f_scale_v2 %>%
+    mutate_at(vars(all_of(bm)), ~ scale_column(., mean_val_f_v2[1,1], sd_val_f_v2[1,1]))
+
+}
+
+# Final scaled dataframe
+ivs_stand_v2 <- rbind(ivs_m_scale_v2, ivs_f_scale_v2)
+
+```
+
+
+## V3
+```{r}
+ivs_stand_v3 <- scale_biomarkers(ivs_removed_v3, ivs_removed_v3 %>% select(sgptval:mwaist_avg) %>% names())
+```
+
+
+# Cleaning
+## V1
+```{r}
+# Make Weeks a factor
+ivs_stand$week_fac <- as.factor(ivs_stand$week)
+
+# Make BM's numeric
+ivs_stand <- ivs_stand %>%
+  mutate_at(vars(sgptval:mwaist_avg), as.numeric)
+
+# Clean out some unnecessary columns
+ivs_stand <- ivs_stand %>% select(-c(X.x, X.y, study))
+
+colnames(ivs_stand)
+
+```
+  * Metabolic Markers
+    + ftcval (Fasting total cholesterol val mg/dl)
+    + ftgval (Fasting triglycerides value mg/dL)
+    + fldlval (Fasting LDL value mg/dL)
+    + fhdlval (Fasting HDL value mg/dL)
+  * Markers of Inflammation and Infection
+    + hemocv (Hemoglobin value (g/dl))
+    + rbc (Red Blood Cell count)
+    + anccv (Abs count neutrophil value (mm^3))
+    + platcv (Platelets value (mm^3))
+    + alympcnt (Abs Lymphocyte count)
+    + lipval (Lipase)
+    + mcv (mean corpuscular volume)
+    + neutcv (neutrophil value)
+    + eosin (eosinphil value)
+  * Markers of Organ Function
+    + sgotval (Aspartate Aminotransferase)
+    + sgptval (Alanine Aminotransferase)
+    + cretval (Serum Creatinine Kinase)
+    + bunval (Blood Urea Nitrogen)
+    + ckval (Creatine Kinase)
+  * Cardiovascular Markers
+    + MAP (from syst_avg and dia_avg)
+  * Anthropometric Markers
+    + BMI
+    + mwaist_avg
+  
+21 biomarkers in total
+
+
+## V2
+```{r}
+# Make Weeks a factor
+ivs_stand_v2$week_fac <- as.factor(ivs_stand_v2$week)
+
+# Make BM's numeric
+ivs_stand_v2 <- ivs_stand_v2 %>%
+  mutate_at(vars(cretval:platcv, bmi:mwaist_avg), as.numeric)
+
+
+colnames(ivs_stand_v2)
+```
+
+
+## V3
+```{r}
+# Make Weeks a factor
+ivs_stand_v3$week_fac <- as.factor(ivs_stand_v3$week)
+
+# Make BM's numeric
+ivs_stand_v3 <- ivs_stand_v3 %>%
+  mutate_at(ivs_removed_v3 %>% select(sgptval:mwaist_avg) %>% names(), as.numeric)
+
+colnames(ivs_stand_v3)
+```
+
+
+# Remove Outliers in Baseline
+## V1
+There are a lot of extreme upper values. Get rid of them in baseline since we will standardize based on baseline. 
+```{r}
+ivs_stand %>%
+  mutate(across(sgptval:mwaist_avg, ~ ifelse(abs(.) > 4, NA, .))) %>%
+  summarize(total_na = sum(is.na(across(everything()))))
+
+ivs_stand %>%
+  summarize(total_na = sum(is.na(across(everything()))))
+
+ivs_stand_removed <- ivs_stand %>%
+  mutate(across(sgptval:mwaist_avg, ~ ifelse(abs(.) > 4, NA, .)))
+
+ivs_bm_names <- ivs_stand_removed %>% select(sgptval:mwaist_avg, -specage.x) %>% names()
+
+for (bm in ivs_bm_names) {
+  
+  hist(ivs_stand_removed %>% select(bm))
+}
+
+
+```
+
+## V2
+There are a lot of extreme upper values. Get rid of them in baseline since we will standardize based on baseline. 
+```{r}
+
+ivs_stand_v2 %>%
+  mutate(across(cretval:mwaist_avg, ~ ifelse(abs(.) > 4, NA, .))) %>%
+  summarize(total_na = sum(is.na(across(everything()))))
+
+ivs_stand_v2 %>%
+  summarize(total_na = sum(is.na(across(everything()))))
+
+ivs_stand_removed_v2 <- ivs_stand_v2 %>%
+  mutate(across(cretval:mwaist_avg, ~ ifelse(abs(.) > 4, NA, .)))
+
+ivs_bm_names_v2 <- ivs_stand_removed_v2 %>% select(cretval:mwaist_avg) %>% names()
+
+for (bm in ivs_bm_names_v2) {
+  
+  hist(ivs_stand_removed_v2 %>% select(bm))
+}
+
+
+```
+
+## V3
+There are a lot of extreme upper values. Get rid of them in baseline since we will standardize based on baseline. 
+```{r}
+
+ivs_stand_v3 %>%
+  mutate(across(sgptval:mwaist_avg, ~ ifelse(abs(.) > 4, NA, .))) %>%
+  summarize(total_na = sum(is.na(across(everything()))))
+
+ivs_stand_v3 %>%
+  summarize(total_na = sum(is.na(across(everything()))))
+
+ivs_stand_removed_v3 <- ivs_stand_v3 %>%
+  mutate(across(sgptval:mwaist_avg, ~ ifelse(abs(.) > 4, NA, .)))
+
+ivs_bm_names_v3 <- ivs_stand_removed_v3 %>% select(sgptval:mwaist_avg) %>% names()
+
+for (bm in ivs_bm_names_v3) {
+  
+  hist(ivs_stand_removed_v3 %>% select(bm))
+}
+
+
+```
+
+
+
+# Directionality
+## V1
+```{r}
+# New data frame with averages
+# avg_ivs_stand <- ivs_stand %>%
+#   group_by(week) %>%
+#   summarize(across(syst_avg:mwaist_avg, mean, na.rm = TRUE))
+# 
+# # Reshape the data into long format
+# avg_ivs_stand_long <- avg_ivs_stand %>% gather(biomarker, value, syst_avg:bmi)
+# 
+# # Choose the time point for labeling (e.g., week 96)
+# label_time <- 96
+# 
+# # Filter the data to include only the chosen time point
+# avg_ivs_stand_long_labels <- avg_ivs_stand_long %>% filter(week == label_time)
+# 
+# # Plot the overlayed biomarker values over time with direct labels
+# ggplot(avg_ivs_stand_long, aes(x = week, y = value, color = biomarker)) +
+#   geom_line() +
+#   xlab("Week") +
+#   ylab("Biomarker Value") +
+#   ggtitle("Overlayed Biomarker Values over Time")
+
+biomarkers <- ivs_stand_removed %>%
+  select(sgptval:mwaist_avg) %>%
+  names()
+
+
+for (bm in biomarkers) {
+  # Plot the overlayed biomarker values over time with direct labels as dots
+  print(ggplot(ivs_stand_removed %>% filter(week == 0), aes_string(x = "specage.y", y = bm, color = "sex")) +
+    geom_point() +  # Plot data points as dots
+    geom_smooth(method = "lm", se = FALSE) +  # Add a regression line
+    xlab("Age") +
+    ylab("Biomarker Value") +
+    ggtitle(paste("Overlayed Biomarker Values over Time -", bm)))
+}
+
+
+```
+
+Markers that need to be flipped:
++ sgotval (Higher value shows liver damage)
++ fldlval (Higher is worse)
++ platcv (Higher may be because of infection)
+
+## V2
+```{r}
+
+biomarkers_v2 <- ivs_stand_removed_v2 %>%
+  select(cretval:mwaist_avg) %>%
+  names()
+
+
+for (bm in biomarkers_v2) {
+  # Plot the overlayed biomarker values over time with direct labels as dots
+  print(ggplot(ivs_stand_removed_v2 %>% filter(week == 0), aes_string(x = "specage.y", y = bm, color = "sex")) +
+    geom_point() +  # Plot data points as dots
+    geom_smooth(method = "lm", se = FALSE) +  # Add a regression line
+    xlab("Age") +
+    ylab("Biomarker Value") +
+    ggtitle(paste("Overlayed Biomarker Values over Time -", bm)))
+}
+```
+
+
+## V3
+```{r}
+
+biomarkers_v3 <- ivs_stand_removed_v3 %>%
+  select(sgptval:mwaist_avg) %>%
+  names()
+
+
+for (bm in biomarkers_v3) {
+  # Plot the overlayed biomarker values over time with direct labels as dots
+  print(ggplot(ivs_stand_removed_v3 %>% filter(week == 0), aes_string(x = "specage.y", y = bm, color = "sex")) +
+    geom_point() +  # Plot data points as dots
+    geom_smooth(method = "lm", se = FALSE) +  # Add a regression line
+    xlab("Age") +
+    ylab("Biomarker Value") +
+    ggtitle(paste("Overlayed Biomarker Values over Time -", bm)))
+}
+```
+
+
+# Flip negative sloped biomarkers and make scaled CA column
+## V1
+```{r}
+# Multiply selected columns by -1
+ivs_stand_flipped <- ivs_stand_removed %>%
+  mutate_at(vars(ftcval, fldlval, platcv), ~ . * -1)   
+
+# Create scaled choronological age column
+ivs_stand_flipped$scaled_age <- scale(ivs_stand_flipped$specage.y)
+
+```
+
+## V2
+```{r}
+# Multiply selected columns by -1
+ivs_stand_flipped_v2 <- ivs_stand_removed_v2 %>%
+  mutate_at(vars(fhdlval, platcv), ~ . * -1)   
+
+# Create scaled choronological age column
+ivs_stand_flipped_v2$scaled_age <- scale(ivs_stand_flipped_v2$specage.y)
+```
+
+## V3
+```{r}
+# Multiply selected columns by -1
+ivs_stand_flipped_v3 <- ivs_stand_removed_v3 %>%
+  mutate_at(vars(fhdlval, sgotval, platcv), ~ . * -1)   
+
+# Create scaled choronological age column
+ivs_stand_flipped_v3$scaled_age <- scale(ivs_stand_flipped_v3$specage.y)
+```
+
+## Check by participant (male)
+### V1
+```{r}
+
+for (bm in biomarkers) {
+  
+  print(ggplot(ivs_stand_flipped %>% filter(sex == "F"), aes_string(x = "specage.y", y = bm, 
+                                                                    group = "publicID")) +
+  geom_point() +
+  geom_line() +
+  xlab("Age") +
+  ylab(bm) +
+  ggtitle("Scatterplot with Lines for Timepoints"))
+}
+
+```
+
+Biomarkers that seem to decrease significantly with age (both m and f):
+
+  * fldlval
+
+Too straight...
+
+  * sgotval
+  * bunval
+  * ckval
+  * cretval
+  * ftgval
+  * eosin
+  
+## V3
+```{r}
+for (bm in biomarkers_v3) {
+  
+  print(ggplot(ivs_stand_flipped_v3 %>% filter(sex == "F"), aes_string(x = "specage.y", y = bm, 
+                                                                    group = "publicID")) +
+  geom_point() +
+  geom_line() +
+  xlab("Age") +
+  ylab(bm) +
+  ggtitle("Scatterplot with Lines for Timepoints"))
+}
+```
+
+
+### V3 Export Removed BM's
+```{r}
+write.csv(ivs_stand_flipped, paste0(root, "Exported_Data/ivs_stand_flipped.csv"))
+
+
+
+biomarkers_V3_removed <- scaled_ivs_comp %>% 
+  select(lipval, fldlval, hemocv, hema, rbc, mcv, ftcval, mono, baso, eosin, lymph, neutcv) %>% 
+  names()
+
+# Specify the list of titles
+titles <- c("Lipase", "Fasting LDL Cholesterol (mg/dL)", "Hemoglobin (g/dl)", "Hematocrit", 
+            "Red Blood Cell Count", " Mean Corpuscular Value (Microns)", 
+            "Fasting Total Cholesterol (mg/dL)", "Monocytes Value", "Basophil Value", 
+            "Eosinphil Value", "Lymphocyte Value", "Neutrophil Percentage")  # Replace with your titles
+
+for (i in seq_along(biomarkers_V3_removed)) {
+  bm <- biomarkers_V3_removed[i]
+  title <- paste("Scatterplot by Sex for", titles[i])
+
+  p <- ggplot(scaled_ivs, aes(x = specage.y, group = publicID)) +
+    geom_point(aes_string(y = bm, color = "sex"), size = 1) +
+    geom_line(aes_string(y = bm, color = "sex"), size = 0.5) +
+    facet_grid(sex ~ .) +
+    xlab("Age") +
+    ylab(bm) +
+    ggtitle(title) +
+    theme(
+      plot.title = element_text(hjust = 0.5, size = 16),  # Increase title font size
+      axis.text.x = element_text(size = 14),  # Increase x-axis label font size
+      axis.text.y = element_text(size = 14),  # Increase y-axis label font size
+      axis.title.x = element_text(size = 16),  # Increase x-axis title font size
+      axis.title.y = element_text(size = 16)   # Increase y-axis title font size
+    )
+
+  print(p)
+}
+
+
+
+
+```
+  
+### V3 Export Kept BM's
+```{r}
+write.csv(ivs_stand_flipped, paste0(root, "Exported_Data/ivs_stand_flipped.csv"))
+
+
+biomarkers_V3 <- scaled_ivs_comp %>% 
+  dplyr::select(-c(lipval, fldlval, hemocv, hema, rbc, mcv, ftcval, mono, baso, eosin, lymph, 
+                   neutcv, weight_avg, height_avg)) %>% 
+  names()
+
+# Specify the list of titles
+titles <- c("Systolic BP", "Diastolic BP", "ALT/SGPT", "AST/SGOT", 
+            "Blood Urea Nitrogen", " Creatine Kinase", 
+            "Serum Creatinine", "Fasting Triglycerides (mg/dL)", "Fasting HDL Value (mg/dL)", 
+            "White Blood Cell Count", "Neutrophil Count", "Platelet Value", "BMI", 
+            "Waist Circumference")  # Replace with your titles
+
+for (i in seq_along(biomarkers_V3)) {
+  bm <- biomarkers_V3[i]
+  title <- paste("Scatterplot by Sex for", titles[i])
+
+  p <- ggplot(scaled_ivs, aes(x = specage.y, group = publicID)) +
+    geom_point(aes_string(y = bm, color = "sex"), size = 1) +
+    geom_line(aes_string(y = bm, color = "sex"), size = 0.5) +
+    facet_grid(sex ~ .) +
+    xlab("Age") +
+    ylab(bm) +
+    ggtitle(title) +
+    theme(
+      plot.title = element_text(hjust = 0.5, size = 16),  # Increase title font size
+      axis.text.x = element_text(size = 14),  # Increase x-axis label font size
+      axis.text.y = element_text(size = 14),  # Increase y-axis label font size
+      axis.title.x = element_text(size = 16),  # Increase x-axis title font size
+      axis.title.y = element_text(size = 16)   # Increase y-axis title font size
+    )
+
+  print(p)
+}
+
+
+
+
+```
+
+
+# Scale Starting Age and week
+## V1
+```{r}
+ivs_stand_flipped$scale_base_age <- ivs_stand_flipped$entryage - 7
+ivs_stand_flipped$week_scale <- ivs_stand_flipped$week/48
+ivs_stand_flipped
+```
+
+## V2
+```{r}
+ivs_stand_flipped_v2$scale_base_age <- ivs_stand_flipped_v2$entryage - 7
+ivs_stand_flipped_v2$week_scale <- ivs_stand_flipped_v2$week/48
+```
+
+## V3
+```{r}
+ivs_stand_flipped_v3$scale_base_age <- ivs_stand_flipped_v3$entryage - 7
+ivs_stand_flipped_v3$week_scale <- ivs_stand_flipped_v3$week/48
+```
+
+# Add SES back into
+# V1
+```{r}
+ivs_stand_flipped
+```
+
+
+
+
+
+# Export
+```{r}
+# ivs_stand_flipped <- ivs_stand_flipped %>% select(-c(sgotval, bunval, ckval, cretval, ftgval, eosin))
+
+write.csv(ivs_stand_flipped, "/Users/hansoochang/Drexel/PHACS:AMP/data/ivs_stand_flipped.csv")
+write.csv(ivs_stand_flipped_v2, "/Users/hansoochang/Drexel/PHACS:AMP/data/ivs_stand_flipped_v2.csv")
+write.csv(ivs_stand_flipped_v3, "/Users/hansoochang/Drexel/PHACS:AMP/data/ivs_stand_flipped_v3.csv")
+
+# Assuming 'participant_id' is the unique identifier for each participant
+ivs_stand_flipped_v3 %>%
+  group_by(publicID) %>%
+  summarize(num_week = n_distinct(week)) %>%
+  filter(num_week == 3) 
+
+```
+
+
+
+
