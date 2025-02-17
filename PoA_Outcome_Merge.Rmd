@@ -1,0 +1,421 @@
+---
+title: "PoA_Outcome_Merge"
+output: html_document
+date: "2023-09-13"
+---
+
+This file reads in the three PoA calculations and correctly merges these files with all the outcomes csv files. Also merges demographic data
+
+1. Read in all files
+2. Standardize PoA Columns
+3. Merge demographic data
+4. Merge SES data
+5. Make certain outcome dataframes wide
+6. Merge PoA and Outcome files
+7. Write Files
+
+
+# Libraries
+```{r}
+library("skimr")
+library("dplyr")
+library("RcmdrMisc")
+library("haven")
+library("sjPlot")
+library(ggplot2)
+library(purrr)
+library(stats)
+library(tidyr)
+library(dplyr)
+```
+
+# Read in Data
+```{r}
+
+
+# Outcomes (Numeric)
+diag <- read.csv(paste0(root, "Kevin_Outcome_Measures/Diagnoses.csv"))
+func <- read.csv(paste0(root, "Exported_Data/funct_lim.csv"))
+alc_subst_use <- read.csv(paste0(root, "Exported_Data/alc_subst_use.csv"))
+# qol_1220 <- read.csv(paste0(root, "Exported_Data/qol_12_20_comp_sel.csv"))
+# qol_0511 <- read.csv(paste0(root, "Exported_Data/qol_5_11_comp_sel.csv"))
+# basc_p <- read.csv(paste0(root, "Kevin_Outcome_Measures/Parent_Reported_BASC_II.csv"))
+# basc_c <- read.csv(paste0(root, "Kevin_Outcome_Measures/Self_Reported_BASC_II.csv"))
+basc_sum <- read.csv(paste0(root, "Exported_Data/basc_sum.csv"))
+# qol_mos <- read.csv(paste0(root, "Kevin_Outcome_Measures/QoL_MOS_SF_36.csv"))
+diag_cat_all <- read.csv(paste0(root, "Exported_Data/diag_cat_all.csv"))
+mental_qol_12_20 <- read.csv(paste0(root, "Exported_Data/mental_qol_12_20.csv"))
+physical_qol_12_20 <- read.csv(paste0(root, "Exported_Data/physical_qol_12_20.csv"))
+
+# Difference Scores
+basc_sum_diff <- read.csv(paste0(root, "Exported_Data/basc_sum_diff.csv"))
+physical_qol_12_20_diff <- read.csv(paste0(root, "Exported_Data/physical_qol_12_20_diff.csv"))
+funct_lim_diff <- read.csv(paste0(root, "Exported_Data/funct_lim_diff.csv"))
+
+# Outcomes (Categorized or Binarized)
+basc_cat <- read.csv(paste0(root, "Exported_Data/basc_cat.csv"))
+qol_1220_cat <- read.csv(paste0(root, "Exported_Data/qol_12_20_comp_flip_bin_sel.csv"))
+qol_0511_cat <- read.csv(paste0(root, "Exported_Data/qol_5_11_comp_flip_bin_sel.csv"))
+subst_comp <- read.csv(paste0(root, "Exported_Data/subst_comp.csv"))
+funct_lim_bin <- read.csv(paste0(root, "Exported_Data/funct_lim_bin.csv"))
+diag_cat_all_bin <- read.csv(paste0(root, "Exported_Data/diag_cat_all_bin.csv"))
+
+# PoA
+chang <- read.csv(paste0(root, "Exported_Data/chang.csv"))
+belsky <- read.csv(paste0(root, "Exported_Data/belsky.csv"))
+kdm_poa <- read.csv(paste0(root, "Exported_Data/kdm.csv"))
+kdm <- read.csv(paste0(root, "Exported_Data/kdm_all_comp.csv"))
+
+
+# Demographic Data
+dem <- read.csv(paste0(root, "/Exported_Data/m4_dem.csv")) %>%
+  mutate(prace = ifelse(prace == "Unknown", "Other", prace))
+
+# SES Data
+ses <- read.csv(paste0(root, "/Exported_Data/cgvisits_sel.csv"))
+
+
+```
+
+
+
+# Merge Demographic Data 
+```{r}
+chang_dem <- merge(chang %>% select(publicID, poa, group), 
+                         dem %>% select(publicID, entryage, sex:prace) %>% distinct,
+                         by = c("publicID"))
+
+
+belsky_dem <- merge(belsky %>% select(publicID, poa, group), 
+                         dem %>% select(publicID, entryage, sex:prace) %>% distinct,
+                         by = c("publicID"))
+
+kdm_dem <- merge(kdm %>% select(publicID, week, kdm:kdm_advance) , 
+                         dem %>% select(publicID, entryage:prace),
+                         by = c("publicID", "week"))
+
+kdm_dem_wide <- wideFormatByWeek(kdm_dem, c(0,48,96), "base", "96", c("kdm", "kdm_advance"))
+
+
+```
+
+# Merge SES Data
+```{r}
+
+chang_dem_ses <- merge(chang_dem, ses, by = "publicID") %>% select(-X)
+belsky_dem_ses <- merge(belsky_dem, ses, by = "publicID") %>% select(-X)
+kdm_dem_ses <- merge(kdm_dem, ses, by = "publicID") %>% select(-X)
+kdm_dem_wide_ses <- merge(kdm_dem_wide, ses, by = "publicID") %>% select(-X)
+
+
+```
+
+
+
+# Standardize PoA Columns
+```{r}
+# # Standardize poa and kdm to make models comparable.
+# chang_dem_scale <- standardize_columns(chang_dem, "poa", sex)
+# belsky_dem_scale <- standardize_columns(belsky_dem, "poa", sex)
+# kdm_dem_scale <- standardize_columns(kdm_dem, c("kdm", "kdm_advance"), sex)
+# 
+# kdm_dem_wide_scale <- standardize_columns(kdm_dem_wide, 
+#                                     c("kdm_advance_0", "kdm_advance_48", "kdm_advance_96"), 
+#                                     sex)
+
+```
+
+# Merge all PoA into one file
+```{r}
+chang_dem_prep <- chang_dem_ses %>%
+  select(-group) %>%
+  rename_at(vars(poa), ~paste0(., "_chang"))
+
+belsky_dem_prep <- belsky_dem_ses %>%
+  select(-group) %>%
+  rename_at(vars(poa), ~paste0(., "_belsky"))
+
+kdm_dem_wide_prep <- kdm_dem_wide_ses %>%
+  rename_at(vars(kdm_48:kdm_advance_0), ~paste0(., "_kdm"))
+
+
+c_b_m1 <- merge(chang_dem_prep, 
+                belsky_dem_prep, 
+                by = c("publicID", "entryage", "sex", "prace", "degrrc", "income"))
+
+all_poa_dem <- merge(c_b_m1, 
+                     kdm_dem_wide_prep %>% select(-c(sex, prace)), 
+                     by = c("publicID", "entryage", "degrrc", "income"))
+
+```
+
+
+
+# Outcomes Clean and Make wide (except substance, alcohol)
+## Numeric
+```{r}
+diag_wide <- wideFormatByWeek(diag, c(0, 96), "base", "96", c("diagcd", "status"))
+func_wide <- wideFormatByWeek(func, c(48, 96), "base", "96", c("hvigor": "funct_lim_mean"))
+# qol_1220_wide <- wideFormatByWeek(qol_1220, c(48, 96), "base", "96",
+#                                   c("physical_function_sum": "mental_sum"))
+# qol_0511_wide <- wideFormatByWeek(qol_0511, c(48, 96), "base", "96", 
+#                                   c("physical_function_sum": "mental_sum"))
+# basc_p_wide <- wideFormatByWeek(basc_p, c(0, 96), "base", "96", c("respwho": "socialts"))
+# basc_c_wide <- wideFormatByWeek(basc_c, c(0, 96), "base", "96", c("basc2rv": "esits"))
+
+qol_phys_wide <- wideFormatByWeek(physical_qol_12_20, c(48, 96), "base", "96",
+                                  c("symovral":"phys_mean"))
+
+qol_ment_wide <- wideFormatByWeek(mental_qol_12_20, c(48, 96), "base", "96",
+                                  c("pbullies":"ment_mean"))
+basc_wide <- wideFormatByWeek(basc_sum, c(0, 96), "base", "96", c("externrw": "ascrw"))
+# qol_mos_wide <- wideFormatByWeek(qol_mos, c(48, 96), "base", "96", c("feelgen": "symppain"))
+diag_cat_all_wide <- wideFormatByWeek(diag_cat_all, c(0, 96), "base", "96", 
+                                      c("skin_related": "neuro"))
+alc_subst_use_wide <- wideFormatByWeek(alc_subst_use, c(24, 96), "24", "96", 
+                                      c("SmokeFreq": "AlcoholDalyNu", "risky_sum"))
+
+# Assuming df is your dataframe
+qol_mos_wide <- qol_mos_wide %>%
+  group_by(publicID) %>%
+  summarize_all(~ifelse(all(is.na(.)), NA, first(na.omit(.))))
+
+# qol_1220_wide <- qol_1220_wide %>%
+#   group_by(publicID) %>%
+#   summarize_all(~ifelse(all(is.na(.)), NA, first(na.omit(.))))
+# 
+# qol_0511_wide <- qol_0511_wide %>%
+#   group_by(publicID) %>%
+#   summarize_all(~ifelse(all(is.na(.)), NA, first(na.omit(.))))
+
+# basc_p_wide <- basc_p_wide %>%
+#   group_by(publicID) %>%
+#   summarize_all(~ifelse(all(is.na(.)), NA, first(na.omit(.))))
+# 
+# basc_c_wide <- basc_c_wide %>%
+#   group_by(publicID) %>%
+#   summarize_all(~ifelse(all(is.na(.)), NA, first(na.omit(.))))
+
+basc_wide <- basc_wide %>%
+  group_by(publicID) %>%
+  summarize_all(~ifelse(all(is.na(.)), NA, first(na.omit(.))))
+
+
+qol_phys_wide <- qol_phys_wide %>%
+  group_by(publicID) %>%
+  summarize_all(~ifelse(all(is.na(.)), NA, first(na.omit(.)))) 
+
+qol_ment_wide <- qol_ment_wide %>%
+  group_by(publicID) %>%
+  summarize_all(~ifelse(all(is.na(.)), NA, first(na.omit(.)))) 
+
+diag_cat_all_wide <- diag_cat_all_wide %>%
+  group_by(publicID) %>%
+  summarize_all(~ifelse(all(is.na(.)), NA, first(na.omit(.)))) 
+
+
+alc_subst_use_wide <- alc_subst_use_wide %>%
+  group_by(publicID) %>%
+  summarize_all(~ifelse(all(is.na(.)), NA, first(na.omit(.)))) 
+
+
+# Write CSV's for future use
+write.csv(func_wide, paste0(root, "Exported_Data/func_wide.csv"))
+write.csv(basc_wide, paste0(root, "Exported_Data/basc_wide.csv"))
+write.csv(qol_phys_wide, paste0(root, "Exported_Data/qol_phys_wide.csv"))
+write.csv(qol_ment_wide, paste0(root, "Exported_Data/qol_ment_wide.csv"))
+write.csv(diag_cat_all_wide, paste0(root, "Exported_Data/diag_cat_all_wide.csv"))
+write.csv(alc_subst_use_wide, paste0(root, "Exported_Data/alc_subst_use_wide.csv"))
+
+
+
+```
+
+
+
+## Categorized
+```{r}
+basc_cat_wide <- wideFormatByWeek(basc_cat, c(0, 96), "base", "96", c("hyperts": "internts"))
+
+qol_1220_cat_wide <- wideFormatByWeek(qol_1220_cat, c(48, 96), "48", "96", 
+                                      c("physical_function_sum": "mental_sum"))
+
+qol_0511_cat_wide <- wideFormatByWeek(qol_0511_cat, c(48, 96), "48", "96", 
+                                      c("physical_function_sum": "mental_sum"))
+
+
+subst_comp$week <- subst_comp$mergeweek
+subst_comp_wide <- wideFormatByWeek(subst_comp, c(24, 72), "24", "72", 
+                                      c("subst_ever_sum": "subst_count"))
+
+
+funct_lim_bin_wide <- wideFormatByWeek(funct_lim_bin, c(48, 96), "48", "96", c("hvigor": "heatdres"))
+
+diag_cat_all_bin_wide <- wideFormatByWeek(diag_cat_all_bin, c(0, 96), "base", "96", 
+                                      c("skin_related": "neuro"))
+
+
+basc_cat_wide <- basc_cat_wide %>%
+  group_by(publicID) %>%
+  summarize_all(~ifelse(all(is.na(.)), NA, first(na.omit(.))))
+
+qol_1220_cat_wide <- qol_1220_cat_wide %>%
+  group_by(publicID) %>%
+  summarize_all(~ifelse(all(is.na(.)), NA, first(na.omit(.))))
+
+qol_0511_cat_wide <- qol_0511_cat_wide %>%
+  group_by(publicID) %>%
+  summarize_all(~ifelse(all(is.na(.)), NA, first(na.omit(.))))
+
+subst_comp_wide <- subst_comp_wide %>%
+  group_by(publicID) %>%
+  summarize_all(~ifelse(all(is.na(.)), NA, first(na.omit(.))))
+
+funct_lim_bin_wide <- funct_lim_bin_wide %>%
+  group_by(publicID) %>%
+  summarize_all(~ifelse(all(is.na(.)), NA, first(na.omit(.))))
+
+diag_cat_all_bin_wide <- diag_cat_all_bin_wide %>%
+  group_by(publicID) %>%
+  summarize_all(~ifelse(all(is.na(.)), NA, first(na.omit(.)))) 
+
+
+
+```
+
+
+
+
+# Merge PoA and Wide Outcomes
+## Numeric
+```{r}
+# Diagnoses needs to be done.
+all_poa_func <- merge(all_poa_dem,func_wide, by = "publicID")
+# all_poa_qol_1220 <- merge(all_poa_dem, qol_1220_wide, by = "publicID")
+# all_poa_qol_0511 <- merge(all_poa_dem, qol_0511_wide, by = "publicID")
+all_poa_qol_phys <- merge(all_poa_dem, qol_phys_wide, by = "publicID")
+all_poa_qol_ment <- merge(all_poa_dem, qol_ment_wide, by = "publicID")
+# all_poa_basc_p <- merge(all_poa_dem, basc_p_wide, by = "publicID")
+# all_poa_basc_c <- merge(all_poa_dem, basc_c_wide, by = "publicID")
+all_poa_basc <- merge(all_poa_dem, basc_wide, by = "publicID")
+# all_poa_qol_mos <- merge(all_poa_dem, qol_mos_wide, by = "publicID")
+all_poa_diag <- full_join(all_poa_dem, diag_cat_all_wide, by = "publicID")
+all_poa_risky <- merge(all_poa_dem, alc_subst_use_wide, by = "publicID")
+
+
+full_join(all_poa_dem, diag_cat_all_wide, by = "publicID") %>%
+  mutate(sum_0 = rowSums(select(., ends_with("_0")), na.rm = TRUE),
+         sum_96 = rowSums(select(., ends_with("_96")), na.rm = TRUE))
+
+```
+
+## Difference Scores
+```{r}
+all_poa_basc_diff <- merge(all_poa_dem, basc_sum_diff, by = "publicID")
+all_poa_basc_qol_phys_diff <- merge(all_poa_dem, physical_qol_12_20_diff, by = "publicID")
+all_poa_funct_lim_diff <- merge(all_poa_dem, funct_lim_diff, by = "publicID")
+
+```
+
+
+
+## Categorized
+```{r}
+
+all_poa_basc_cat <- merge(all_poa_dem, basc_cat_wide, by = "publicID")
+all_poa_qol1220_cat <- merge(all_poa_dem, qol_1220_cat_wide, by = "publicID")
+all_poa_qol0511_cat <- merge(all_poa_dem, qol_0511_cat_wide, by = "publicID")
+all_poa_risky_cat <- merge(all_poa_dem, subst_comp_wide, by = "publicID")
+all_poa_func_cat <- merge(all_poa_dem, funct_lim_bin_wide, by = "publicID")
+all_poa_diag_bin <- full_join(all_poa_dem, diag_cat_all_bin_wide, by = "publicID")
+
+# Use mutate_at to convert the specified columns to factors
+all_poa_basc_cat <- all_poa_basc_cat %>%
+  mutate_at(vars(hyperts_0:internts_96), as.factor)
+
+all_poa_qol1220_cat <- all_poa_qol1220_cat %>%
+  mutate_at(vars(physical_function_sum_48:mental_sum_96), as.factor)
+
+all_poa_qol0511_cat <- all_poa_qol0511_cat %>%
+  mutate_at(vars(physical_function_sum_48:mental_sum_96), as.factor)
+
+all_poa_risky_cat <- all_poa_risky_cat %>%
+  mutate_at(vars(subst_ever_sum_72:subst_count_24), as.factor)
+
+all_poa_func_cat <- all_poa_func_cat %>%
+  mutate_at(vars(hvigor_48:heatdres_96), as.factor)
+
+all_poa_diag_bin <- all_poa_diag_bin %>%
+  mutate_at(vars(skin_related_96:neuro_0), as.factor)
+
+```
+
+# Scale to mean =1 and sd = 1
+```{r}
+# Numeric
+all_poa_func <- all_poa_func %>%
+  mutate(across(c(poa_chang:kdm_advance_0_kdm), ~ scale(.) + 1))
+all_poa_qol_phys <- all_poa_qol_phys %>%
+  mutate(across(c(poa_chang:kdm_advance_0_kdm), ~ scale(.) + 1))
+all_poa_qol_ment <- all_poa_qol_ment %>%
+  mutate(across(c(poa_chang:kdm_advance_0_kdm), ~ scale(.) + 1))
+all_poa_diag <- all_poa_diag %>%
+  mutate(across(c(poa_chang:kdm_advance_0_kdm), ~ scale(.) + 1))
+all_poa_risky_cat <- all_poa_risky_cat %>%
+  mutate(across(c(poa_chang:kdm_advance_0_kdm), ~ scale(.) + 1))
+
+# Difference Scores
+all_poa_basc_diff <- all_poa_basc_diff %>%
+  mutate(across(c(poa_chang:kdm_advance_0_kdm), ~ scale(.) + 1))
+
+
+```
+
+
+
+
+# Write files
+## Numeric
+```{r}
+write.csv(all_poa_func, paste0(root, "Exported_Data/all_poa_func.csv"))
+write.csv(all_poa_qol_phys, paste0(root, "Exported_Data/all_poa_qol_phys.csv"))
+write.csv(all_poa_qol_ment, paste0(root, "Exported_Data/all_poa_qol_ment.csv"))
+# write.csv(all_poa_basc_p, paste0(root, "Exported_Data/all_poa_basc_p.csv"))
+# write.csv(all_poa_basc_c, paste0(root, "Exported_Data/all_poa_basc_c.csv"))
+write.csv(all_poa_basc, paste0(root, "Exported_Data/all_poa_basc.csv"))
+# write.csv(all_poa_qol_mos, paste0(root, "Exported_Data/all_poa_qol_mos.csv"))
+# write.csv(qol_mos_wide, paste0(root, "Exported_Data/qol_mos_wide.csv"))
+write.csv(all_poa_diag, paste0(root, "Exported_Data/all_poa_diag.csv"))
+write.csv(all_poa_risky, paste0(root, "Exported_Data/all_poa_risky.csv"))
+
+
+```
+
+## Difference Scores
+```{r}
+write.csv(all_poa_basc_diff, paste0(root, "Exported_Data/all_poa_basc_diff.csv"))
+write.csv(all_poa_basc_qol_phys_diff, paste0(root, "Exported_Data/all_poa_basc_qol_phys_diff.csv"))
+write.csv(all_poa_funct_lim_diff, paste0(root, "Exported_Data/all_poa_funct_lim_diff.csv"))
+
+```
+
+
+## Categorized
+```{r}
+write.csv(all_poa_basc_cat, paste0(root, "Exported_Data/all_poa_basc_cat.csv"))
+write.csv(all_poa_qol1220_cat, paste0(root, "Exported_Data/all_poa_qol1220_cat.csv"))
+write.csv(all_poa_qol0511_cat, paste0(root, "Exported_Data/all_poa_qol0511_cat.csv"))
+
+write.csv(all_poa_risky_cat, paste0(root, "Exported_Data/all_poa_risky_cat.csv"))
+write.csv(all_poa_func_cat, paste0(root, "Exported_Data/all_poa_func_cat.csv"))
+write.csv(all_poa_diag_bin, paste0(root, "Exported_Data/all_poa_diag_bin.csv"))
+```
+
+
+
+
+
+
+
+
+
