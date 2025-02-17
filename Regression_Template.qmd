@@ -1,0 +1,223 @@
+---
+title: "Regression_Template"
+format:
+  html: 
+    theme: cosmo
+    fontsize: 1.1em
+    linestretch: 1.7
+toc: true
+editor: visual
+params:
+  df: df
+  outcome_list: outcome_list
+  last_time: last_time
+  first_time: first_time
+---
+
+This file runs regression analyses
+
+Regression Template: 96 week outcome \~ PoA\*sex + entry_age + baseline_outcome
+
+```{r}
+#| echo: false
+#| warning: false
+
+source("/Users/hansoochang/Drexel/PHACS:AMP/Code/root.R")
+source("/Users/hansoochang/Drexel/PHACS:AMP/Code/Helper_Functions.R")
+
+library("skimr")
+library("dplyr")
+library("RcmdrMisc")
+library("haven")
+library("sjPlot")
+library(ggplot2)
+library(purrr)
+library(stats)
+library(tidyr)
+library(knitr)
+library(e1071)
+library(nnet)
+library(pscl)
+library(gridExtra)
+library(corrplot)
+
+```
+
+# Change Data Frame Format
+
+```{r}
+#| warning: false
+df <- jsonlite::fromJSON(params$df)
+
+```
+
+# Run Regressions
+
+```{r}
+#| warning: false
+
+# Chang
+chang_mod <- run_lin_models(df, params$outcome_list, 
+                                      "poa_chang*sex + entryage + income + prace", 
+                               params$last_time, params$first_time)
+
+# Belsky
+belsky_mod <- run_lin_models(df, params$outcome_list, 
+                                       "poa_belsky*sex + entryage + income + prace", 
+                               params$last_time, params$first_time)
+
+# KDM 
+kdm_mod <- run_lin_models(df, 
+                          params$outcome_list,
+                          "kdm_advance_0_kdm*sex + entryage + income + prace", 
+                               params$last_time, params$first_time)
+
+
+# # Chang
+# chang_mod <- run_lin_models(all_poa_func,
+#                             outcome_list = c("hvigor", "hmoderat", "hwalkup", "hwlkblok",
+#                                              "hbending", "heatdres"),
+#                                       "poa_chang*sex + entryage + income + prace",
+#                                "96", "48")
+# 
+# # Belsky
+# belsky_mod <- run_lin_models(all_poa_func, outcome_list = c("hvigor", "hmoderat", "hwalkup",
+#                                                             "hwlkblok", "hbending", "heatdres"),
+#                                        "poa_belsky*sex + entryage + income + prace",
+#                                "96", "48")
+# 
+# # KDM
+# kdm_mod <- run_lin_models(all_poa_func,
+#                           outcome_list = c("hvigor", "hmoderat", "hwalkup", "hwlkblok",
+#                                            "hbending", "heatdres"),
+#                           "kdm_advance_0_kdm*sex + entryage + income + prace",
+#                                "96", "48")
+
+
+
+```
+
+# Get P-Values
+
+```{r}
+#| warning: false
+
+chang_b_p <- get_betas_and_pvalues(chang_mod)
+belsky_b_p <- get_betas_and_pvalues(belsky_mod)
+kdm_b_p <- get_betas_and_pvalues(kdm_mod)
+
+get_significant_vars(chang_b_p, "poa")
+get_significant_vars(belsky_b_p, "poa")
+get_significant_vars(kdm_b_p, "kdm")
+
+
+```
+
+# Get RMSE, MAE, and R-Squared
+
+```{r}
+#| warning: false
+chang_sensemakr <- get_lin_model_metrics_sensemakr(df, chang_mod, "poa_chang")
+belsky_sensemakr <- get_lin_model_metrics_sensemakr(df, belsky_mod, "poa_belsky")
+kdm_sensemakr <- get_lin_model_metrics_sensemakr(df, kdm_mod, "kdm_advance_0_kdm")
+
+
+# Assuming your outputs are named output1 and output2
+# Convert each output list to a list of data frames
+output1_dfs <- lapply(chang_sensemakr,
+                      function(x) as.data.frame(x))
+output2_dfs <- lapply(belsky_sensemakr,
+                      function(x) as.data.frame(x))
+output3_dfs <- lapply(kdm_sensemakr,
+                      function(x) as.data.frame(x))
+
+# Initialize an empty list to store merged data frames
+merged_dfs <- list()
+
+# Loop through each element and merge the data frames
+for (name in names(output1_dfs)) {
+  df1 <- output1_dfs[[name]]
+  df2 <- output2_dfs[[name]]
+  df3 <- output3_dfs[[name]]
+  
+  # Merge all three outputs
+  merged <- data.frame(
+    Metric = c("R_Squared", "Partial_R_Squared", "MAE1", "RMSE1"),
+    Chang = c(df1$R_Squared, df1$Partial_R_Squared_sensemakr, df1$MAE1, df1$RMSE1),
+    Belsky = c(df2$R_Squared, df2$Partial_R_Squared_sensemakr, df2$MAE1, df2$RMSE1),
+    KDM = c(df3$R_Squared, df3$Partial_R_Squared_sensemakr, df3$MAE1, df3$RMSE1)
+  )
+  
+  merged_dfs[[name]] <- merged
+}
+
+# Print the merged data frames
+merged_dfs
+
+
+```
+
+# Check Multicollinearity
+
+## Correlation Matrix
+
+```{r}
+#| warning: false
+
+# Convert factors to dummy variables
+df_dummies <- df %>%
+  select(poa_chang, poa_belsky, kdm_advance_0_kdm, sex, entryage, income, prace) %>%
+  mutate(across(where(is.character), ~as.numeric(as.factor(.x))))
+
+cor_matrix <- cor(df_dummies, use = "pairwise.complete.obs")
+
+# Plot the correlation matrix
+corrplot(cor_matrix, title="Correlation Plot", method = "circle", addCoef.col = "black")
+
+```
+
+## VIF
+
+```{r}
+#| warning: false
+run_initial_models_with_vif(df, params$outcome_list, params$last_time, params$first_time)
+
+```
+
+# Run Stepwise AIC
+
+```{r}
+run_stepwise_model(df, params$outcome_list, params$last_time, params$first_time)
+
+
+```
+
+# Optimize By Anova
+
+```{r}
+# Example usage:
+initial_models <- run_initial_models(df, params$outcome_list, params$last_time,
+                                     params$first_time)
+optimized_models <- optimize_models_by_anova(initial_models)
+
+optimized_models
+
+
+```
+
+# Show Visuals
+
+```{r}
+#| warning: false
+
+plots_lists <- create_combined_plots(dataframe = df, outcome_names = params$outcome_list)
+
+# To display the plots for each outcome variable
+outcome_vars <- paste0(params$outcome_list, "_96")
+  
+for (outcome_name in outcome_vars) {
+  grid.arrange(grobs = plots_lists[[outcome_name]], ncol = 2)  # Adjust the number of columns as needed
+}
+
+
+```
