@@ -1,0 +1,498 @@
+---
+title: "PoA_V3"
+output:
+  html_document:
+    toc: true
+    theme: united
+date: "2023-08-29"
+---
+
+
+This file calculates the Pace of Aging for all three methods. *** Version 3 with biomarkers chosen by Step AIC
+
+Read in:
+
+  * ivs_stand_flipped_v3.csv (from Biomarker_Cleaning.Rmd)
+  * hxw0101.sas7bdat (Viral Load)
+
+Output: 
+
+  * Dataframes with Pace of Aging for each method
+
+
+# Libraries
+```{r,  echo=FALSE, warning=FALSE, error=FALSE, message=FALSE}
+library("skimr")
+library("dplyr")
+library("RcmdrMisc")
+library("haven")
+library("sjPlot")
+library(ggplot2)
+library(purrr)
+library(tidyr)
+library(ggrepel)
+library(lme4)
+library(LDATS)
+library(dplyr)
+library(BioAge)
+library(Metrics)
+library(ggpubr)
+library(broom)
+library(tibble)
+```
+
+# Read in Dataframe
+```{r}
+
+# Biomarkers
+ivs_stand <- read.csv(paste0(root, "/data/ivs_stand_flipped_v3.csv"))
+
+ivs_stand %>% filter(week == 0) %>% summarise(
+  min_age = min(specage.y, na.rm = TRUE),
+  max_age = max(specage.y, na.rm = TRUE))
+
+ivs_stand <- ivs_stand %>% select(-specage.x)
+
+# Viral Load
+hxw <- read_sas(paste0 (root, "/data/hxw0101.sas7bdat"))
+
+v_load <- hxw %>% select(week, visitage, rnaage, rnaobt, rna, rnabeage, rnaafage)
+
+```
+
+
+# Get Random Intercept for each biomarker for each Participant
+## Our Method
+This chunk also runs an anova to test whether including a random slope and intercept improves the model
+```{r, warning=FALSE, error=FALSE, message=FALSE}
+
+biomarkers <- ivs_stand %>%
+  select(sgptval:mwaist_avg) %>%
+  names()
+
+
+# Create an empty dataframe to store the random effects
+random_intercept_df <- data.frame(id = unique(ivs_stand$publicID))
+random_slope_df <- data.frame(id = unique(ivs_stand$publicID))
+fixed_slope_df <- data.frame(biomarker = NA)
+anova_results <- data.frame(biomarker = NA, p_value = NA)
+
+# This for loop extracts the fixed and random slope and intercept for each biomarker
+for (bm in biomarkers) {
+  print(bm)
+  # Create the formula dynamically
+  formula <- as.formula(paste(bm, "~ 1 + scale_base_age*week_scale + (1 + week_scale | publicID)"))
+  
+  # Fit the lmer model
+  model <- lmer(formula, data = ivs_stand)
+  
+  # Extract the random effects of the intercept
+  random_intercept <- as.data.frame(ranef(model)$publicID[,1])
+  random_slope <- as.data.frame(ranef(model)$publicID[,2])
+  fixed_slope <- as.data.frame(fixef(model)[2])
+  
+
+  # Add the random effects to the dataframe
+  random_intercept_df <- merge(random_intercept_df, random_intercept, by = 0, all = T)
+  names(random_intercept_df)[length(names(random_intercept_df))] <- bm 
+  
+  random_slope_df <- merge(random_slope_df, random_slope, by = 0, all = T)
+  names(random_slope_df)[length(names(random_slope_df))] <- bm 
+  
+  fixed_slope_df[,bm] <- fixed_slope
+  
+  # Fit the lmer model without random effects
+  model_no_re <- lm(paste(bm, "~ 1 + scale_base_age*week_scale"), data = ivs_stand)
+  
+  # Run ANOVA test to compare models
+  anova_result <- anova(model, model_no_re)
+  p_value <- anova_result[["Pr(>Chisq)"]][2]  # Extract the p-value for the random effects
+  
+  anova_results <- rbind(anova_results, data.frame(biomarker = bm, p_value = p_value))
+}
+
+# Filter significant results for ANOVA
+significant_results <- anova_results %>% filter(p_value < 0.05)
+significant_results
+
+# Clean up the dataframe
+random_intercept_df <- random_intercept_df %>%
+  select(-matches("Row.names"))
+
+random_slope_df <- random_slope_df %>%
+  select(-matches("Row.names"))
+
+```
+
+# Run softmax function for the intercepts
+```{r}
+
+# Take out ID column
+df_softmax <- random_intercept_df %>% select(-id)
+
+# Make all NA's into 0's
+df_softmax <- df_softmax %>% mutate_all(~replace(., is.na(.), 0))
+
+# Apply softmax function across rows
+df_softmax <- apply(df_softmax, 1, softmax)
+ 
+df_softmax <- cbind(random_intercept_df$id, as.data.frame(t(df_softmax)))
+
+skim(df_softmax)
+# make sure all the rows add up to one
+rowSums(df_softmax[,-1])
+
+```
+
+# Calculate Belsky 2015
+```{r, warning=FALSE, error=FALSE, message=FALSE}
+biomarkers <- ivs_stand %>%
+  select(sgptval:mwaist_avg) %>%
+  names()
+
+# Create an empty dataframe to store the random effects
+random_slope_belsky <- data.frame(publicID = unique(ivs_stand$publicID), biomarker = NA)
+
+
+# This for loop extracts the random slope for each biomarker
+for (bm in biomarkers) {
+  # Create the formula dynamically
+  formula <- as.formula(paste(bm, "~ 1 + scale_base_age*week_scale + (1 + week_scale | publicID)"))
+  
+  # Fit the lmer model
+  model <- lmer(formula, data = ivs_stand)
+  
+  # Extract the random effects of the slope
+  random_slope <- as.data.frame(ranef(model)$publicID[,2])
+  
+
+  # Add the random effects to the dataframe
+  random_slope_belsky <- merge(random_slope_belsky, random_slope, by = 0, all = T)
+  
+  names(random_slope_belsky)[length(names(random_slope_belsky))] <- bm 
+
+}
+
+# Clean up the dataframe
+random_slope_belsky <- random_slope_belsky %>%
+  select(-matches("Row.names"))
+random_slope_belsky <- random_slope_belsky %>% select(-biomarker)
+
+# Print the resulting dataframe
+skim(random_slope_belsky)
+
+```
+
+
+# KDM
+## Split and train on baseline training
+Not enough participants to split by gender
+```{r}
+set.seed(18)
+
+# Create age column and clean # 
+ivs_stand$age <- ivs_stand$specage.y
+ivs_stand <- ivs_stand %>% select(-contains("X."))
+
+# ### Males ### 
+# ivs_stand_m <- ivs_stand %>% filter(sex == "M") 
+# ivs_stand_m_sample <- sample(c(TRUE, FALSE), nrow(ivs_stand_m), 
+#                              replace=TRUE, prob=c(0.5,0.5))
+# male_train <- ivs_stand_m[ivs_stand_m_sample, ]
+# male_test <- ivs_stand_m[!ivs_stand_m_sample, ]
+# 
+# ### Females ###
+# ivs_stand_f <- ivs_stand %>% filter(sex == "F") 
+# ivs_stand_f_sample <- sample(c(TRUE, FALSE), nrow(ivs_stand_f), 
+#                              replace=TRUE, prob=c(0.5,0.5))
+# female_train <- ivs_stand_f[ivs_stand_f_sample, ]
+# female_test <- ivs_stand_f[!ivs_stand_f_sample, ]
+
+# Split into time points
+ivs_stand_base <- ivs_stand %>% filter(week == 0) 
+ivs_stand_48 <- ivs_stand %>% filter(week == 48) 
+ivs_stand_96 <- ivs_stand %>% filter(week == 96) 
+```
+
+# Remove Outliers in baseline training
+## Graph Distribution
+```{r}
+biomarkers <- ivs_stand_base %>% select(sgptval:mwaist_avg) %>% names()
+
+for (bm in biomarkers) {
+  hist(ivs_stand_base[,bm], main = paste("Histogram of", bm))
+}
+```
+
+## remove any outliers
+```{r}
+ivs_stand_base <- ivs_stand_base %>%
+  mutate(across(biomarkers, ~ ifelse(abs(.) > 4, NA, .)))
+```
+
+```{r}
+
+# Train Baseline
+ivs_stand_base_sample <- sample(c(TRUE, FALSE), nrow(ivs_stand_base), 
+                             replace=TRUE, prob=c(0.5,0.5))
+ivs_stand_base_train <- ivs_stand_base[ivs_stand_base_sample, ]
+ivs_stand_base_test <- ivs_stand_base[!ivs_stand_base_sample, ]
+
+```
+
+
+## Train KDM
+```{r}
+markers <- ivs_stand_base %>%
+  select(cretval:mwaist_avg) %>%
+  names()
+
+kdm_train_base <- kdm_calc(ivs_stand_base_train, biomarkers = markers)
+
+kdm_train_base_comp <- kdm_train_base$data %>% filter(!is.na(kdm))
+
+```
+
+# KDM Correlation tests between kdm_age and chronological age
+```{r}
+cor.test(as.numeric(kdm_train_base_comp$kdm), as.numeric(kdm_train_base_comp$age))
+rmse(as.numeric(kdm_train_base_comp$kdm), as.numeric(kdm_train_base_comp$age))
+mae(as.numeric(kdm_train_base_comp$kdm), as.numeric(kdm_train_base_comp$age))
+
+```
+
+## Project to test
+```{r}
+kdm_test_base <- kdm_calc(ivs_stand_base_test, biomarkers = markers, fit = kdm_train_base$fit, s_ba2 = 
+                        kdm_train_base$fit$s_ba2)
+
+kdm_test_base_comp <- kdm_test_base$data %>% filter(!is.na(kdm))
+```
+
+## Correlation tests between kdm_age (both genders) and chronological age
+```{r}
+cor.test(as.numeric(kdm_test_base_comp$kdm), as.numeric(kdm_test_base_comp$age))
+rmse(as.numeric(kdm_test_base_comp$kdm), as.numeric(kdm_test_base_comp$age))
+mae(as.numeric(kdm_test_base_comp$kdm), as.numeric(kdm_test_base_comp$age))
+
+kdm_test_base_comp$gender <- kdm_test_base_comp$sex
+#plot age vs bioage
+plot_ba(kdm_test_base_comp, "kdm", "KDM\nBiological Age")
+
+#plot age vs bioage
+plot_ba(kdm_test_base_comp, "kdm_advance", "KDM\nBiological Age")
+
+```
+
+# Project KDM to next time points
+```{r}
+# 48 weeks
+kdm_project_48 <- kdm_calc(ivs_stand_48, biomarkers = markers, fit = kdm_train_base$fit, s_ba2 = 
+                        kdm_train_base$fit$s_ba2)
+
+kdm_project_48_comp <- kdm_project_48$data %>% filter(!is.na(kdm))
+
+# 96 weeks
+kdm_project_96 <- kdm_calc(ivs_stand_96, biomarkers = markers, fit = kdm_train_base$fit, s_ba2 = 
+                        kdm_train_base$fit$s_ba2)
+
+kdm_project_96_comp <- kdm_project_96$data %>% filter(!is.na(kdm))
+
+
+
+```
+
+# Correlation and Metrics for Future Projections
+```{r}
+# 48 weeks 
+nrow(kdm_project_48_comp)
+cor.test(as.numeric(kdm_project_48_comp$kdm), as.numeric(kdm_project_48_comp$age))
+rmse(as.numeric(kdm_project_48_comp$kdm), as.numeric(kdm_project_48_comp$age))
+mae(as.numeric(kdm_project_48_comp$kdm), as.numeric(kdm_project_48_comp$age))
+
+# 96 weeks 
+nrow(kdm_project_96_comp)
+cor.test(as.numeric(kdm_project_96_comp$kdm), as.numeric(kdm_project_96_comp$age))
+rmse(as.numeric(kdm_project_96_comp$kdm), as.numeric(kdm_project_96_comp$age))
+mae(as.numeric(kdm_project_96_comp$kdm), as.numeric(kdm_project_96_comp$age))
+```
+
+
+# Look at KDM Longitudinally
+```{r}
+kdm_project_48_comp$gender <- kdm_project_48_comp$sex
+kdm_project_96_comp$gender <- kdm_project_96_comp$sex
+
+kdm_all_comp <- rbind(kdm_project_96_comp, rbind(kdm_test_base_comp, kdm_project_48_comp))
+
+# Add a column to signify KDM when comparing with other PoA methods.
+kdm_all_comp$group <- "kdm"
+
+kdm_all_comp_3weeks <- kdm_all_comp %>%
+  group_by(publicID) %>%
+  filter(n() == 3) %>%
+  ungroup()
+
+ggplot(kdm_all_comp_3weeks, aes(x = age, y = kdm, group = publicID)) +
+  geom_point(aes(color = gender)) + 
+  geom_line(aes(color = gender)) +
+  geom_abline(slope = 1, intercept = 0, color = "black", linetype = "dashed") +
+  labs(x = "Age", y = "KDM") +
+  theme_minimal()
+
+hist(kdm_all_comp$kdm_advance)
+```
+
+
+# KDM Pace of Aging
+```{r}
+# All participants with at least 2 time points.
+kdm_all_comp_2weeks <- kdm_all_comp %>%
+  group_by(publicID) %>%
+  filter(n() >= 2) %>%
+  ungroup()
+
+# Get individual models and slopes
+# individual_models <- kdm_all_comp_2weeks %>%
+#   group_by(publicID) %>%
+#   do(beta = summary(lm(kdm ~ week_scale * scale_base_age, data = .))$coefficients["week_scale",1],
+#      p_val = summary(lm(kdm ~ week_scale * scale_base_age, data = .))$coefficients["week_scale",4])
+# 
+# individual_models <- unnest(individual_models)
+
+
+# Fit a linear mixed-effects model
+kdm_mixed_model <- lmer(kdm ~ week_scale * scale_base_age + (week_scale | publicID), 
+                    data = kdm_all_comp_2weeks)
+
+# Extract random effects
+random_effects <- ranef(kdm_mixed_model)
+
+# Make into dataframe
+kdm_re <- random_effects$publicID %>%
+  rownames_to_column(var = "publicID")
+kdm_re$publicID <- as.integer(kdm_re$publicID)
+
+
+# Rename column and add one
+kdm_re <- kdm_re %>%
+  rename(poa = week_scale)
+
+# Add 1
+kdm_re$poa <- kdm_re$poa + 1
+```
+
+# Merge KDM dataframe with KDM PoA
+```{r}
+
+kdm_poa <- right_join(kdm_all_comp %>% select(publicID, sgptval:mwaist_avg, group),
+      kdm_re %>% select(publicID, poa),
+      by = "publicID")
+```
+
+# Distribution of KDM PoA
+```{r}
+hist(kdm_poa$poa)
+sd(kdm_poa$poa)
+
+```
+
+
+# Predict Pace of Biological Aging for Current Participants
+## Our method random slope and random intercept
+Pace of BAi = sumj = 1(Wji * m1ji)
+```{r}
+# Multiply Matrices
+combo <- random_slope_df[,-1] * df_softmax[, -1]
+# Replace NA values with column averages
+for(i in 1:ncol(combo)){ 
+  combo[is.na(combo[,i]), i] <- mean(combo[,i], na.rm = TRUE)
+}
+
+# Calculated pace of aging (sum of rows)
+combo$poa <- round(rowSums(combo), digits = 5)
+
+# add public id to dataframe
+combo$publicID <- random_slope_df$id
+
+combo$poa <- combo$poa + 1
+
+hist(combo$poa)
+
+sd(combo$poa)
+combo$poa
+```
+
+
+# Belsky 2015 Prediction
+Pace of BAi = sumj = 1(m1ji / number of biomarkers)
+```{r}
+# Select the range of columns you want to divide by the length
+cols_to_divide <- random_slope_belsky %>% select(cretval:mwaist_avg) %>% names()
+
+random_slope_belsky <- random_slope_belsky %>%
+  mutate(across(all_of(cols_to_divide), ~ . / length(cols_to_divide)))
+
+
+# Replace NA values with column averages
+for(i in 1:ncol(random_slope_belsky)){ 
+  random_slope_belsky[is.na(random_slope_belsky[,i]), i] <- mean(random_slope_belsky[,i], na.rm = TRUE)
+}
+
+
+# Calculated pace of aging (sum of rows)
+random_slope_belsky$poa <- round(rowSums(random_slope_belsky %>% select(cols_to_divide)), digits = 5)
+random_slope_belsky$poa <- random_slope_belsky$poa + 1
+hist(random_slope_belsky$poa)
+
+
+```
+
+
+# Export PoA Prediction
+```{r}
+combo$group <- "Chang"
+random_slope_belsky$group <- "Belsky"
+
+write.csv(combo, paste0(root, "Exported_Data/chang.csv"))
+write.csv(random_slope_belsky, paste0(root, "Exported_Data/belsky.csv"))
+write.csv(kdm_poa, paste0(root, "Exported_Data/kdm.csv"))
+
+# KDM by time point (Not PoA)
+write.csv(kdm_all_comp, paste0(root, "Exported_Data/kdm_all_comp.csv"))
+
+
+length(unique(combo$publicID))
+length(unique(random_slope_belsky$publicID))
+length(unique(kdm_poa$publicID))
+
+mean(combo$poa)
+sd(combo$poa)
+mean(belsky$poa)
+sd(belsky$poa)
+mean(kdm_all_comp$kdm_advance)
+sd(kdm_all_comp$kdm_advance)
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
