@@ -1,6 +1,6 @@
 # PHACS Project
 
-This repository contains the code and documentation for the PHACS project. The project focuses on processing and analyzing biomarker data, calculating pace of aging, and assessing HIV viral load.
+This repository contains the code and documentation for the PHACS project. The project focuses on processing and analyzing biomarker data, calculating pace of aging, and assessing HIV viral load. Data are not included for privacy and confidentiality.
 
 ## Table of Contents
 
