@@ -1,0 +1,325 @@
+---
+title: "BinLog_Reg_Template"
+format:
+  html: 
+    theme: cosmo
+    fontsize: 1.1em
+    linestretch: 1.7
+toc: true
+editor: visual
+params:
+  df: df
+  outcome_list: outcome_list
+  last_time: last_time
+  first_time: first_time
+---
+
+
+This file runs Binomial Logistic regression analyses
+
+Regression Template: 96 week outcome \~ PoA\*sex + entry_age + baseline_outcome
+
+```{r}
+#| echo: false
+#| warning: false
+
+source("/Users/hansoochang/Drexel/PHACS:AMP/Code/root.R")
+source("/Users/hansoochang/Drexel/PHACS:AMP/Code/Helper_Functions.R")
+
+library("skimr")
+library("dplyr")
+library("RcmdrMisc")
+library("haven")
+library("sjPlot")
+library(ggplot2)
+library(purrr)
+library(stats)
+library(tidyr)
+library(knitr)
+library(nnet)
+library(pscl)
+library(e1071)
+library(caret)
+library(gridExtra)
+library(corrplot)
+
+```
+
+# Change Data Frame Format
+
+```{r}
+#| warning: false
+df <- jsonlite::fromJSON(params$df)
+
+
+```
+
+# Run Regressions
+```{r}
+#| warning: false
+
+
+# Chang
+chang_log <- run_logit_models(df, params$outcome_list,
+                                      "poa_chang*sex + entryage + income + prace",
+                                params$last_time, params$first_time)
+
+ # Belsky
+belsky_log <- run_logit_models(df, params$outcome_list,
+                                       "poa_belsky*sex + entryage + income + prace",
+                                params$last_time, params$first_time)
+
+ # KDM
+kdm_log <- run_logit_models(df, params$outcome_list,
+                                        "kdm_advance_0_kdm*sex + entryage + income + prace",
+                                params$last_time, params$first_time)
+ 
+# # Chang
+# chang_log <- run_logit_models(all_poa_diag_bin,
+#                               getOutcomeNames(all_poa_diag_bin),
+#                                       "poa_chang*sex + entryage + income + prace",
+#                                "96", "0")
+# 
+# 
+# # Belsky
+# belsky_log <- run_logit_models(all_poa_diag_bin,
+#                                getOutcomeNames(all_poa_diag_bin),
+#                                        "poa_belsky*sex + entryage + income + prace",
+#                                "96", "0")
+# 
+# # KDM
+# kdm_log <- run_logit_models(all_poa_diag_bin,
+#                             getOutcomeNames(all_poa_diag_bin),
+#                                        "kdm_advance_0_kdm*sex + entryage + income + prace",
+#                                "96", "0")
+
+```
+
+
+# Get P-Values
+```{r}
+#| warning: false
+
+
+chang_b_p <- get_betas_and_pvalues_logit(chang_log)
+belsky_b_p <- get_betas_and_pvalues_logit(belsky_log)
+kdm_b_p <- get_betas_and_pvalues_logit(kdm_log)
+
+get_significant_vars(chang_b_p, "poa")
+get_significant_vars(belsky_b_p, "poa")
+get_significant_vars(kdm_b_p, "kdm")
+
+
+```
+
+
+# Accuracy, Sensitivity, Specificity
+```{r}
+chang_metrics <- evaluate_logit_models(df, chang_log)
+belsky_metrics <- evaluate_logit_models(df, belsky_log)
+kdm_metrics <- evaluate_logit_models(df, kdm_log)
+
+# chang_metrics <- evaluate_logit_models(all_poa_qol1220_cat, chang_log)
+# belsky_metrics <- evaluate_logit_models(all_poa_qol1220_cat, belsky_log)
+# kdm_metrics <- evaluate_logit_models(all_poa_qol1220_cat, kdm_log)
+
+# Assuming your outputs are named chang_results, belsky_results, and kdm_results
+# Convert each output list to a list of data frames
+chang_dfs <- lapply(chang_metrics, function(x) as.data.frame(x))
+belsky_dfs <- lapply(belsky_metrics, function(x) as.data.frame(x))
+kdm_dfs <- lapply(kdm_metrics, function(x) as.data.frame(x))
+
+# Initialize an empty list to store merged data frames
+merged_dfs <- list()
+
+# # Loop through each element and merge the data frames
+# for (name in names(chang_dfs)) {
+#   df1 <- chang_dfs[[name]]
+#   df2 <- belsky_dfs[[name]]
+#   df3 <- kdm_dfs[[name]]
+#   
+#   # Merge all three outputs
+#   merged <- data.frame(
+#     Metric = c("Accuracy", "Sensitivity", "Specificity"),
+#     Chang = c(df1$Accuracy, df1$Sensitivity, df1$Specificity),
+#     Belsky = c(df2$Accuracy, df2$Sensitivity, df2$Specificity),
+#     KDM = c(df3$Accuracy, df3$Sensitivity, df3$Specificity)
+#   )
+#   
+#   merged_dfs[[name]] <- merged
+# }
+# 
+# # Print the merged data frames
+# merged_dfs
+
+
+
+# Loop through each element and merge the data frames
+for (name in names(chang_dfs)) {
+  df1 <- chang_dfs[[name]]
+  df2 <- belsky_dfs[[name]]
+  df3 <- kdm_dfs[[name]]
+  
+  # If df1, df2, or df3 is NULL, set MAE and RMSE to NA
+  if (is.null(df1)) {
+    df1$Accuracy <- NA
+    df1$Sensitivity <- NA
+    df1$Specificity <- NA
+  } 
+
+  if (is.null(df2)) {
+    df2$Accuracy <- NA
+    df2$Sensitivity <- NA
+    df2$Specificity <- NA
+  } 
+
+  if (is.null(df3)) {
+    df3$Accuracy <- NA
+    df3$Sensitivity <- NA
+    df3$Specificity <- NA
+  }
+
+  # Merge all three outputs
+  merged <- data.frame(
+    Metric = c("Accuracy", "Sensitivity", "Specificity"),
+    Chang = c(df1$Accuracy, df1$Sensitivity, df1$Specificity),
+    Belsky = c(df2$Accuracy, df2$Sensitivity, df2$Specificity),
+    KDM = c(df3$Accuracy, df3$Sensitivity, df3$Specificity)
+  )
+  
+  merged_dfs[[name]] <- merged
+}
+
+# Print the merged data frames
+merged_dfs
+
+```
+
+# Check Multicollinearity
+## Correlation Matrix 
+```{r}
+#| warning: false
+
+# Convert factors to dummy variables
+df_dummies <- df %>%
+  select(poa_chang, poa_belsky, kdm_advance_0_kdm, sex, entryage, income, prace) %>%
+  mutate(across(where(is.character), ~as.numeric(as.factor(.x))))
+
+cor_matrix <- cor(df_dummies, use = "pairwise.complete.obs")
+
+# Plot the correlation matrix
+corrplot(cor_matrix, title="Correlation Plot", method = "circle", addCoef.col = "black")
+
+```
+
+## VIF
+```{r}
+#| warning: false
+run_initial_binlog_models_with_vif(df, params$outcome_list, params$last_time, params$first_time)
+
+
+```
+
+# Run Stepwise AIC
+```{r}
+#| warning: false
+
+run_stepwise_binlog_model(df, params$outcome_list, params$last_time, params$first_time)
+
+```
+
+# Optimize By Chi Square
+```{r}
+#| warning: false
+
+# Example usage:
+initial_models <- run_initial_binlog_models(df, params$outcome_list, params$last_time,
+                                     params$first_time)
+optimized_models <- optimize_models_by_chisq(initial_models)
+
+optimized_models
+
+# 
+# dataframe <- all_poa_risky_cat
+# outcome_list <- getOutcomeNamesCustom(all_poa_risky_cat, suffixes = c(72, 24))
+# last_time <- "72"
+# first_time <- "24"
+# 
+# a <- run_initial_binlog_models(all_poa_risky_cat,
+#                           getOutcomeNamesCustom(all_poa_risky_cat, suffixes = c(72, 24)),
+#                           "72", "24")
+# 
+# optimize_models_by_chisq(a)
+# 
+# 
+#   library(pscl)
+#   library(lmtest)
+#   
+#   optimized_list <- list()
+#   
+#   for (name in names(a)) { 
+#     model <- model_list[[name]]
+#     
+#     # Extract outcome variable
+#     outcome_var <- all.vars(formula(model))[1]
+#     
+#     # DEBUGGING: Check that the outcome variable exists in the dataset
+#     if (!(outcome_var %in% names(model$model))) {
+#       stop(paste("Error: Outcome variable", outcome_var, "not found in the dataset for model", name))
+#     }
+#     
+#     # Variables to consider for removal
+#     potential_remove_vars <- c("poa_chang", "poa_belsky", "kdm_advance_0_kdm")
+#     current_vars <- setdiff(all.vars(formula(model)), outcome_var)
+#     
+#     changed <- TRUE
+#     
+#     while(changed) {
+#       changed <- FALSE
+#       
+#       # Try removing variables
+#       for (var in potential_remove_vars) {
+#         if (var %in% current_vars) {
+#           # Construct formula without the variable to be removed
+#           reduced_formula_str <- paste(outcome_var, "~", paste(setdiff(current_vars, var), collapse = " + "))
+#           reduced_model <- glm(as.formula(reduced_formula_str), data = model$model, family = "binomial")
+#           
+#           # Compare models using anova for GLMs (Likelihood ratio test)
+#           comparison <- anova(reduced_model, model, test = "Chisq")
+#           p_value <- comparison$`Pr(>Chi)`[2]
+#   
+#           # If p-value is large, then the reduced model is not significantly worse
+#           if (p_value > 0.05) {
+#             model <- reduced_model
+#             current_vars <- setdiff(all.vars(formula(model)), outcome_var)
+#             changed <- TRUE
+#           }
+#         }
+#       }
+#     }
+#     
+#     optimized_list[[name]] <- model
+#   }
+
+```
+
+
+# Show Visuals
+```{r}
+#| warning: false
+
+plots_lists <- create_combined_plots(dataframe = df, outcome_names = params$outcome_list, 
+                                     last_time = paste0("_", params$last_time))
+
+
+# To display the plots for each outcome variable
+outcome_vars <- paste0(params$outcome_list, "_", params$last_time)
+
+  
+for (outcome_name in outcome_vars) {
+  grid.arrange(grobs = plots_lists[[outcome_name]], ncol = 2)  # Adjust the number of columns as needed
+}
+
+
+```
+
