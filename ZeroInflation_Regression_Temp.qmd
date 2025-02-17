@@ -1,0 +1,261 @@
+---
+title: "ZeroInflation_Regression_Temp"
+format:
+  html: 
+    theme: cosmo
+    fontsize: 1.1em
+    linestretch: 1.7
+toc: true
+editor: visual
+params:
+  df: df
+  outcome_list: outcome_list
+  last_time: last_time
+  first_time: first_time
+---
+
+This file runs regression analyses for zero-inflated data
+
+Regression Template: 96 week outcome \~ PoA\*sex + entry_age + baseline_outcome
+
+```{r}
+#| echo: false
+#| warning: false
+
+source("/Users/hansoochang/Drexel/PHACS:AMP/Code/root.R")
+source("/Users/hansoochang/Drexel/PHACS:AMP/Code/Helper_Functions.R")
+
+library("skimr")
+library("dplyr")
+library("RcmdrMisc")
+library("haven")
+library("sjPlot")
+library(ggplot2)
+library(purrr)
+library(stats)
+library(tidyr)
+library(knitr)
+library(e1071)
+library(nnet)
+library(pscl)
+library(gridExtra)
+library(corrplot)
+
+```
+
+
+# Change Data Frame Format
+```{r}
+#| warning: false
+df <- jsonlite::fromJSON(params$df)
+
+```
+
+
+# Run Regressions
+```{r}
+
+
+# Chang
+chang_mod <- run_zero_inflated_model(df, params$outcome_list, 
+                                      "poa_chang + sex + entryage + prace", 
+                               params$last_time, params$first_time)
+
+# Belsky
+belsky_mod <- run_zero_inflated_model(df, params$outcome_list, 
+                                       "poa_belsky + sex + entryage + prace", 
+                               params$last_time, params$first_time)
+
+# KDM 
+kdm_mod <- run_zero_inflated_model(df, 
+                                   params$outcome_list, 
+                                   "kdm_advance_0_kdm + sex + entryage + prace", 
+                               params$last_time, params$first_time)
+
+
+# # Chang
+# chang_mod <- run_zero_inflated_model(all_poa_risky,
+#                             getOutcomeNamesCustom(all_poa_risky, suffixes = c(96, 24)),
+#                                       "poa_belsky*sex + entryage + income + prace",
+#                                "96", "24")
+# # Belsky
+# belsky_mod <- run_zero_inflated_model(all_poa_basc,
+#                             getOutcomeNames(all_poa_basc),
+#                                        "poa_belsky*sex + entryage + income + prace",
+#                                "96", "0")
+# 
+# kdm_mod <- run_zero_inflated_model(all_poa_basc,
+#                             getOutcomeNames(all_poa_basc),
+#                           "kdm_advance_0_kdm*sex + entryage + income + prace",
+#                                "96", "0")
+
+  
+
+```
+
+# Get P-Values
+```{r}
+#| warning: false
+
+extract_coefficients_zip(chang_mod)
+extract_coefficients_zip(belsky_mod)
+extract_coefficients_zip(kdm_mod)
+
+
+
+```
+
+# Get Metrics
+```{r}
+#| warning: false
+
+chang_zip <- get_fit_metrics_zip(chang_mod, df)
+belsky_zip <- get_fit_metrics_zip(belsky_mod, df)
+kdm_zip <- get_fit_metrics_zip(kdm_mod, df)
+
+# chang_zip <- get_fit_metrics_zip(chang_mod, all_poa_func)
+# belsky_zip <- get_fit_metrics_zip(belsky_mod, all_poa_func)
+# kdm_zip <- get_fit_metrics_zip(kdm_mod, all_poa_func)
+
+
+# Assuming your outputs are named output1 and output2
+# Convert each output list to a list of data frames
+output1_dfs <- lapply(chang_zip,
+                      function(x) as.data.frame(x))
+output2_dfs <- lapply(belsky_zip,
+                      function(x) as.data.frame(x))
+output3_dfs <- lapply(kdm_zip,
+                      function(x) as.data.frame(x))
+
+# Initialize an empty list to store merged data frames
+merged_dfs <- list()
+
+# Loop through each element and merge the data frames
+for (name in names(output1_dfs)) {
+  df1 <- output1_dfs[[name]]
+  df2 <- output2_dfs[[name]]
+  df3 <- output3_dfs[[name]]
+  
+  # If df1, df2, or df3 is NULL, set MAE and RMSE to NA
+  if (is.null(df1)) {
+    mae1 <- NA
+    rmse1 <- NA
+  } else {
+    mae1 <- df1$MAE
+    rmse1 <- df1$RMSE
+  }
+
+  if (is.null(df2)) {
+    mae2 <- NA
+    rmse2 <- NA
+  } else {
+    mae2 <- df2$MAE
+    rmse2 <- df2$RMSE
+  }
+
+  if (is.null(df3)) {
+    mae3 <- NA
+    rmse3 <- NA
+  } else {
+    mae3 <- df3$MAE
+    rmse3 <- df3$RMSE
+  }
+
+  # Merge all three outputs
+  merged <- data.frame(
+    Metric = c("MAE", "RMSE"),
+    Chang = c(mae1, rmse1),
+    Belsky = c(mae2, rmse2),
+    KDM = c(mae3, rmse3)
+  )
+  
+  merged_dfs[[name]] <- merged
+}
+
+
+# Print the merged data frames
+merged_dfs
+```
+
+# Check Multicollinearity
+## Correlation Matrix 
+```{r}
+#| warning: false
+
+# Convert factors to dummy variables
+df_dummies <- df %>%
+  select(poa_chang, poa_belsky, kdm_advance_0_kdm, sex, entryage, income, prace) %>%
+  mutate(across(where(is.character), ~as.numeric(as.factor(.x))))
+
+cor_matrix <- cor(df_dummies, use = "pairwise.complete.obs")
+
+# Plot the correlation matrix
+corrplot(cor_matrix, title="Correlation Plot", method = "circle", addCoef.col = "black")
+
+```
+
+## VIF
+```{r}
+#| warning: false
+
+run_initial_models_with_vif_zi(df, params$outcome_list, params$last_time, params$first_time)
+  
+
+```
+
+
+# Pace of Aging StepAIC
+```{r}
+#| warning: false
+
+run_stepwise_zip_model(df, params$outcome_list, params$last_time, params$first_time)
+
+
+```
+
+# Optimize By Likelihood Ratio comparison
+```{r}
+#| warning: false
+
+# Example usage:
+initial_models <- 
+  run_initial_models_zip(df, params$outcome_list, params$last_time, params$first_time)
+
+optimized_models <- optimize_models_by_anova_zip(initial_models)
+
+optimized_models
+
+
+```
+
+
+# Show Visuals
+```{r}
+#| warning: false
+
+plots_lists <- create_combined_plots(dataframe = df, outcome_names = params$outcome_list)
+
+# To display the plots for each outcome variable
+outcome_vars <- paste0(params$outcome_list, "_96")
+  
+for (outcome_name in outcome_vars) {
+  grid.arrange(grobs = plots_lists[[outcome_name]], ncol = 2)  # Adjust the number of columns as needed
+}
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
